@@ -1,7 +1,6 @@
-import re
+import os
 import sys
-import queue
-import getopt
+import argparse
 from emulator.assembler import Assembler
 from emulator.memory import Memory
 from emulator.pipeline_units import bus_interface_unit, execution_unit
@@ -22,47 +21,55 @@ SEG_INIT = {
 
 
 def main():
-    help = '''
-    Usage:
-    python main.py ./tests/Requirement/bubble_sort.asm -i
-    python main.py ./tests/Interrupt/show_date_time.asm -n
-    Note: -i prints interrupt information, -n disables interactive debug mode.
-    The tests directory contains sample assembly test cases.
-    Refer to the documentation to write and run your own 8086 assembly code.
-    '''
+    parser = argparse.ArgumentParser(
+        description="Antigravity 8086 Microprocessor Emulator CLI & Interactive TUI",
+        epilog="Examples:\n"
+               "  python main.py ./tests/Requirement/bubble_sort.asm -t\n"
+               "  python main.py ./tests/Interrupt/show_date_time.asm -n\n"
+               "  python main.py ./tests/Requirement/bubble_sort.asm -i\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("file", help="Path to 8086 assembly source file (.asm)")
+    parser.add_argument("-t", "--tui", action="store_true", help="Launch interactive full-screen Neovim/GDB-style TUI debugger")
+    parser.add_argument("-n", "--nodebug", action="store_true", help="Run without interactive debug prompts (continuous run)")
+    parser.add_argument("-i", "--interrupt", action="store_true", help="Print interrupt execution information")
+    parser.add_argument("-g", "--gui-windows", action="store_true", help="Spawn external GUI visualizer windows for peripherals")
 
-    DEBUG = True  # Single-step debug mode flag
-    INT_MSG = False  # Print interrupt messages flag
-    try:
-        opts,args = getopt.getopt(sys.argv[2:],'-h-n-i',['help','nodebug','interrupt'])
-        for opt_name,opt_value in opts:
-            if opt_name in ('-h','--help'):
-                print(help)
-                exit()
-            if opt_name in ('-n', '--nodebug'):
-                DEBUG = False
-            if opt_name in ('-i', '--interrupt'):
-                INT_MSG = True
-        with open(sys.argv[1], 'r', encoding='utf-8') as file:
-            asm_code = file.read()
-    except:
-        print(help)
-        sys.exit("Parameter incorrect")
-   
+    if len(sys.argv) < 2:
+        parser.print_help()
+        sys.exit(1)
+
+    args = parser.parse_args()
+
+    if not os.path.exists(args.file):
+        sys.exit(f"Error: File '{args.file}' not found.")
+
+    # If TUI mode requested, launch the interactive TUI
+    if args.tui:
+        from ui.tui import EmulatorTUI
+        tui = EmulatorTUI(args.file, enable_gui_windows=args.gui_windows)
+        tui.run()
+        return
+
+    with open(args.file, 'r', encoding='utf-8') as file:
+        asm_code = file.read()
+
     assembler = Assembler(SEG_INIT)
     exe_file = assembler.compile(asm_code)
     memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
     memory.load(exe_file) # load code segment
 
     BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, exe_file, memory)
-    EU = execution_unit.execution_unit(BIU, INT_MSG)
+    EU = execution_unit.execution_unit(BIU, args.interrupt)
     cpu = CPU(BIU, EU, gui_mode=False)
     print("\nCPU initialized successfully.")
     print("=" * 80)
 
+    debug_mode = not args.nodebug
     while not cpu.check_done():
-        cpu.iterate(debug=DEBUG)
+        cpu.iterate(debug=debug_mode)
     cpu.print_end_state()
+
 
 if __name__ == "__main__":
     main()
