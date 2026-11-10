@@ -1,13 +1,19 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-22%2F22%20passing-brightgreen)
 
 An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive Neovim/GDB-style Terminal User Interface (TUI), a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
+> 🤖 **Working with an AI coding assistant?** Check out [`AGENTS.md`](AGENTS.md) for a comprehensive architecture map, instruction lifecycle trace, peripheral specs, and developer guidelines.
+
 ---
 
-## What's New in v5.0 (Major Overhaul)
+## What's New in v5.1 & v5.0 (Major Overhaul)
+- **TUI Stack Viewer (`[v]` toggle)**: Real-time inspection of the active call stack (`SS:SP`) showing physical memory addresses, 16-bit word values, and SP offsets directly inside the Memory Inspector pane.
+- **Modern Packaging & CLI Entrypoints (`pyproject.toml`)**: Install via `pip install -e .` and invoke tools globally via `emu8086` and `emu8086-tui`.
+- **Extended Assembler Directives**: Support for `EQU` symbolic constants, `PROC`/`ENDP` procedure blocks, and resilient `ASSUME` pre-scanning.
+- **Structured Error Reporting**: Clear, contextual `AssemblyError` messages pointing to offending lines and source tokens instead of silent exits.
 - **Interactive Full-Screen TUI (`tui.py` & `main.py -t`)**: A terminal user interface designed for developers who love Neovim, GDB-TUI, and Claude Code. Features split-pane disassembly, real-time register & flag diff highlighting, live hardware telemetry, and an interactive memory hex inspector.
 - **EMU8086 Virtual Traffic Light Hardware (I/O Port 4)**: 12-bit word controller driving 12 independent graphical LEDs (Red, Yellow, Green for North, West, South, East) with real-time terminal telemetry and standalone GUI visualizers.
 - **EMU8086 Virtual Stepper Motor Hardware (I/O Port 7)**: 4-bit coil excitation sequencer ($11.25^\circ$ per step, 32 steps per revolution), ready flag polling on bit 7, rotating needle compass telemetry, and animated dial visualizer.
@@ -63,6 +69,7 @@ python3 main.py ./tests/Requirement/bubble_sort.asm -t
 | `k` / `Up` | Move selection up (Disassembly) or scroll memory up (-16 bytes) |
 | `Page Down` / `Page Up` | Scroll memory by 128 bytes |
 | `m` | Cycle memory segment (`DS` $\rightarrow$ `CS` $\rightarrow$ `SS` $\rightarrow$ `ES` $\rightarrow$ `VIDEO`) |
+| `v` | Toggle Memory Inspector view mode (**Hex Dump** $\leftrightarrow$ **Stack View**) |
 | `r` | Reset CPU and reload assembly program to initial state |
 | `+` / `-` | Increase / decrease continuous execution speed |
 | `?` / `h` | Display help tooltip |
