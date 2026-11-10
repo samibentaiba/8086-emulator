@@ -38,6 +38,8 @@ class execution_unit(object):
         self.eu_regs = list(self.reg.keys()) + ['AL', 'AH', 'BL', 'BH', 'CL', 'CH', 'DL', 'DH']
         self.biu_regs = list(BIU.reg.keys()) # 'DS', 'CS', 'SS', 'ES', 'IP'
         self.output = ''
+        from emulator.peripherals import PeripheralManager
+        self.peripherals = PeripheralManager.get_instance()
 
     def print(self, string):
         # emulator print
@@ -1075,13 +1077,19 @@ class execution_unit(object):
             # Input from port into AL or AX. IN AX, 4; IN AL, 7;
             # Supports all registers. Port can be immediate or DX.
             port = self.get_int(self.opd[1]) if self.is_reg(self.opd[1]) else to_decimal(self.opd[1])
-            val = to_decimal(input(f"Input to Port {port}: "))
+            val = None
+            if hasattr(self, 'peripherals') and self.peripherals.has_device(port):
+                val = self.peripherals.read_port(port, self.opbyte)
+            if val is None:
+                val = to_decimal(input(f"Input to Port {port}: "))
             self.write_reg(self.opd[0], val)
         elif self.opcode == 'OUT':
             # Output from AL or AX to port. OUT 4, AX; OUT DX, AX
             # If port > 255, DX is used.
             port = self.get_int(self.opd[0])
             val = self.read_reg(self.opd[1])
+            if hasattr(self, 'peripherals'):
+                self.peripherals.write_port(port, val, self.opbyte)
             self.print("> " * 16 + "@Port {}: 0x{:<4x} => {}\n".format(port, val, val))
         else:
             sys.exit("Operation code not supported")
