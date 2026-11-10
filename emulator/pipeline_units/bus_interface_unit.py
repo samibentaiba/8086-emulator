@@ -6,7 +6,7 @@ import pprint
 class bus_interface_unit(object):
 
     def __init__(self, instruction_queue_size, exe, memory):
-        # 预取指令队列
+        # Prefetch instruction queue
         self.instruction_queue = queue.Queue(instruction_queue_size) # Prefetch input queue
         
         self.reg = {
@@ -41,12 +41,12 @@ class bus_interface_unit(object):
         return self.read_byte(loc + 1) + self.read_byte(loc)
 
     def read_dword(self, loc):
-        # 返回list
+        # Returns list of bytes
         return self.read_byte(loc + 3) + self.read_byte(loc + 2) + \
                self.read_byte(loc + 1) + self.read_byte(loc)
 
     def write_byte(self, loc, content):
-        # content可以为：int、list
+        # content can be int or list
         if isinstance(content, int):
             content = [hex(content)]
         elif isinstance(content, list):
@@ -76,12 +76,12 @@ class bus_interface_unit(object):
             sys.exit("Error write_byte")
 
     def run(self):
-        # 模仿8086取指机制，queue中少了2条及以上指令便取指
+        # Emulate 8086 prefetch mechanism: fetch when queue has space for 2 or more instructions
         if self.instruction_queue.qsize() <= self.instruction_queue.maxsize - 2:
             self.fill_instruction_queue()
     @property
     def next_ins(self):
-        # Pipeline 下一条指令
+        # Pipeline next instruction
         ins_list = list(self.instruction_queue.queue)
         if ins_list:
             return ins_list[0]
@@ -89,17 +89,17 @@ class bus_interface_unit(object):
             return "Pipline is emtpy."
 
     def flush_pipeline(self):
-        # 有分支时刷新pipeline
+        # Flush pipeline on branch
         # print("Flushing pipeline...")
         self.instruction_queue.queue.clear()
         self.pre_fetch_ip = self.reg['IP']
 
     def remain_instruction(self):
-        # 判断cache中是否有需要执行的指令
+        # Check if there are remaining instructions in memory to execute
         return not self.memory.is_null(self.cs_pre_ip)
 
     def fetch_one_instruction(self):
-        # 取单条指令
+        # Fetch single instruction
         instruction = self.memory.rb(self.cs_pre_ip)
         self.instruction_queue.put(instruction)
         self.pre_fetch_ip += 1

@@ -7,38 +7,38 @@ class RegistersModel(DataModel):
     def __init__(self, registers, items, parent=None):
         super(RegistersModel, self).__init__(("Name", "Data"), parent)
 
-        self.registers = registers#该类，也可为变量吧，用于在createitem里寻值
+        self.registers = registers  # Register store instance used to look up values in createItem
         for item in items:
             self._rootItem.appendChild(self.createItem(item))
 
     def createItem(self, name):
-        item = (name, self.registers.reg[name])#self.registers.get_reg(name)为根据name，找到对应寄存器的地址
+        item = (name, self.registers.reg[name])  # Lookup register value by name
         return DataItem(item)
 
 class FlagModel(DataModel):
     def __init__(self, registers, items, parent=None):
         super(FlagModel, self).__init__(("Name", "Data"), parent)
 
-        self.registers = registers#该类，也可为变量吧，用于在createitem里寻值
+        self.registers = registers  # Register store instance used to look up values in createItem
         for item in items:
             self._rootItem.appendChild(self.createItem(item))
 
     def format(self, data, bits):
-        #未调试
+        # Format flag register bits
         if isinstance(data, int):
             return str.format("0x{0:0%dx}" % 1, data)
         else:
             return data
 
     def createItem(self, name):
-        item = (name, self.registers.FR.get_FR_reg(name))#self.registers.get_reg(name)为根据name，找到对应寄存器的地址
+        item = (name, self.registers.FR.get_FR_reg(name))  # Lookup flag value by name
         return DataItem(item)
 
 class CodeSegModel(DataModel):
     def __init__(self, BIU, ip, parent=None):
         super(CodeSegModel, self).__init__(("Addr.", "Data"), parent)
         self.ip = ip
-        # memory范围显示不全 code
+        # Display memory range for code segment
         for addr in range(int('30000', 16), int('300ff', 16)):
             info = BIU.read_byte(addr)
             item = (hex(addr), ' '.join(info))
@@ -54,7 +54,7 @@ class StackSegModel(DataModel):
     def __init__(self, BIU, sp, parent=None):
         super(StackSegModel, self).__init__(("Addr.", "Data"), parent)
         self.sp = sp
-        # memory范围显示不全 stack
+        # Display memory range for stack segment
         for addr in range(int('60000', 16), int('5ff00', 16), -1):
             info = BIU.read_byte(addr)
             item = (hex(addr), ' '.join(info))
@@ -71,7 +71,7 @@ class DataSegModel(DataModel):
     def __init__(self, BIU, parent=None):
         super(DataSegModel, self).__init__(("Addr.", "Data"), parent)
 
-        # memory范围显示不全 data
+        # Display memory range for data segment
         for addr in range(int('20000', 16), int('200ff', 16)):
             info = BIU.read_byte(addr)
             if isinstance(info, int):

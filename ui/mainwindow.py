@@ -19,9 +19,9 @@ from emulator.cpu import CPU
 
 
 INSTRUCTION_QUEUE_SIZE = 6
-MEMORY_SIZE = int('FFFFF', 16)  # 内存空间大小 1MB
-CACHE_SIZE = int('10000', 16)  # 缓存大小 64KB
-SEGMENT_SIZE = int('10000', 16) # 段长度均为最大长度64kB（10000H）
+MEMORY_SIZE = int('FFFFF', 16)  # Memory address space size 1MB
+CACHE_SIZE = int('10000', 16)  # Cache size 64KB
+SEGMENT_SIZE = int('10000', 16) # Maximum segment size 64KB (10000H)
 
 SEG_INIT = {
     'DS': int('2000', 16), # Initial value of data segment

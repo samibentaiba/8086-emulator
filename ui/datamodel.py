@@ -49,7 +49,7 @@ class DataModel(QAbstractItemModel):
         self._rootItem = DataItem(header)
 
     def format(self, data, bits):
-        #未调试
+        # Format raw data into hex string representation
         if isinstance(data, int):
             return str.format("0x{0:0%dx}" % (4), data)
         else:

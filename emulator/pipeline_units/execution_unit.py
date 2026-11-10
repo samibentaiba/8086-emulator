@@ -1,7 +1,6 @@
 import sys
 import re
 import datetime
-from PyQt5 import QtGui
 from emulator.register import *
 from emulator.instructions import *
 from emulator.assembler import to_decimal
@@ -12,16 +11,16 @@ from emulator.assembler import to_decimal
 class execution_unit(object):
 
     def __init__(self, BIU, int_msg):
-        self.IR = []                 # 指令寄存器
-        self.opcode = ''             # 操作码
-        self.opd = []                # 操作数 Operands
-        self.opbyte = 2              # 默认操作字节数: 1,2,4
+        self.IR = []                 # Instruction register
+        self.opcode = ''             # Opcode
+        self.opd = []                # Operands
+        self.opbyte = 2              # Default operand bytes: 1, 2, 4
         self.eo = [0] * 5            # Evaluated opds
-        self.bus = BIU               # 内部总线连接BIU
+        self.bus = BIU               # Internal bus connection to BIU
         # Flag Register
-        self.interrupt = False       # 外部中断请求
-        self.shutdown = False        # 停机
-        self.int_msg = int_msg       # 是否打印中断信息
+        self.interrupt = False       # External interrupt request
+        self.shutdown = False        # CPU shutdown / halt
+        self.int_msg = int_msg       # Print interrupt messages flag
         self.FR = Flag_register()
         self.reg = {
             # Data Register
@@ -107,14 +106,14 @@ class execution_unit(object):
             self.reg[reg] = num
 
     def inc_reg(self, reg, val):
-        # 增加或者减少寄存器的值
+        # Increment or decrement register value
         self.write_reg(reg, self.read_reg(reg) + val)
 
     def get_address(self, opd):
-        # 解析所有内存寻址：直接、寄存器间接、基址、变址、基址变址、相对基址变址
+        # Resolve all memory addressing: direct, register indirect, base, index, base-index, relative base-index
         adr_reg = ['BX', 'SI', 'DI', 'BP']
         seg_reg = ['DS', 'CS', 'SS', 'ES']
-        par_list = [s for s in re.split('\W', opd) if s]
+        par_list = [s for s in re.split(r'\W', opd) if s]
         address = 0
         has_seg = False
         for par in par_list:
@@ -126,7 +125,7 @@ class execution_unit(object):
             else:
                 address += to_decimal(par)
         if not has_seg:
-            if 'BP' in par_list: # 存在BP时默认段寄存器为SS
+            if 'BP' in par_list: # Default segment register is SS when BP is present
                 address += self.read_reg('SS') << 4
             else:
                 address += self.read_reg('DS') << 4
@@ -134,12 +133,12 @@ class execution_unit(object):
         return address
 
     def get_offset(self, opd):
-        # 解析所有内存寻址：直接、寄存器间接、基址、变址、基址变址、相对基址变址
+        # Resolve memory addressing offset: direct, register indirect, base, index, base-index
         # lea 0x3412:0x34; lea [si+bx]; lea 0x12; lea ss:offset; lea [bx][di]
         adr_reg = ['BX', 'SI', 'DI', 'BP']
         seg_reg = ['DS', 'CS', 'SS', 'ES']
-        opd = opd.split(':')[-1] # 去掉段前缀
-        par_list = [s for s in re.split('\W', opd) if s]
+        opd = opd.split(':')[-1] # Remove segment prefix
+        par_list = [s for s in re.split(r'\W', opd) if s]
         offset = 0
         for par in par_list:
             if par in adr_reg:
@@ -151,37 +150,37 @@ class execution_unit(object):
         return offset
 
     def __get_byte(self, opd):
-        # 内存寻址 含有 '[]'
+        # Memory addressing containing '[]'
         address = self.get_address(opd)
         content = self.bus.read_byte(address)
         # self.print("Get Byte content: " + content + " from " + hex(address) + '\n)
         return content
 
     def __get_word(self, opd):
-        # 内存寻址 含有 '[]'
+        # Memory addressing containing '[]'
         address = self.get_address(opd)
         content = self.bus.read_word(address)
         return content
 
     def __get_dword(self, opd):
-        # 内存寻址 含有 '[]'
+        # Memory addressing containing '[]'
         address = self.get_address(opd)
         content = self.bus.read_dword(address)
         return content
 
     def __get_char(self, address):
-        # 获取内存address处的ASCII字符
+        # Get ASCII character at memory address
         return chr(to_decimal(self.bus.read_byte(address)[0]))
 
     def get_int(self, opd):
-        # 自动获取操作数值
-        # 若opd为int也作为地址访问
+        # Automatically get operand value
+        # If opd is int, access as memory address
         if isinstance(opd, int):
             opd = '[' + str(opd) + ']'
-        # 寄存器
+        # Register
         if self.is_reg(opd):
             res = self.read_reg(opd)
-        # 内存
+        # Memory
         elif '[' in opd:
             if self.opbyte == 1:
                 res_list = self.__get_byte(opd)
@@ -197,14 +196,14 @@ class execution_unit(object):
 
             for num in res_list:
                 res = (res << 8) + (int(num, 16) & 0xff)
-        # 立即数
+        # Immediate
         else:
             res = to_decimal(opd)
         # self.print("get_int " + hex(res) + " from " + opd)
         return res
 
     def get_int_from_adr(self, adr):
-        # adsolute adr
+        # Absolute address
         if self.opbyte == 1:
             res_list = self.bus.read_byte(adr)
         elif self.opbyte == 2:
@@ -220,7 +219,7 @@ class execution_unit(object):
         return res
 
     def put_int(self, opd, num):
-        # 自动将num存储到opd（寄存器或者存储器）
+        # Automatically store num to opd (register or memory)
         if self.is_reg(opd):
             self.write_reg(opd, num)
         elif self.is_mem(opd):
@@ -234,7 +233,7 @@ class execution_unit(object):
         return '[' in opd
 
     def write_mem(self, loc, content):
-        # 自动写入内存
+        # Automatically write to memory
         if self.opbyte == 1:
             self.bus.write_byte(loc, content)
         elif self.opbyte == 2:
@@ -300,7 +299,7 @@ class execution_unit(object):
         else:
             pass
 
-    # 计算二进制中有多少个1
+    # Count set bits (popcount) in binary representation
     def popcount(self, num):
         cnt = 0
         while num > 0:
@@ -308,7 +307,7 @@ class execution_unit(object):
             num &= num - 1
         return cnt
 
-    # 根据 opbyte 将 num 转成有符号十进制数
+    # Convert num to signed decimal based on opbyte
     def to_signed(self, num):
         result = 0
         for i in range(self.opbyte * 8):
@@ -318,14 +317,14 @@ class execution_unit(object):
                 result += (num >> i & 1) << i
         return result
 
-    # 根据 opbyte 将 num 转成无符号十进制数
+    # Convert num to unsigned decimal based on opbyte
     def to_unsigned(self, num):
         result = 0
         for i in range(self.opbyte * 8):
             result += (num >> i & 1) << i
         return result
 
-    # 根据 opbyte 所能存储的有符号数的范围 判断是否溢出
+    # Check for signed overflow based on opbyte range
     def is_overflow(self, num):
         low = self.to_signed(int('1' + (self.opbyte * 8 - 1) * '0', 2))
         high = self.to_signed(int('0' + (self.opbyte * 8 - 1) * '1', 2))
@@ -725,17 +724,17 @@ class execution_unit(object):
         
         if self.opcode == 'JMP':
             # self.opbyte = 2
-            if self.is_mem(self.opd[0]): # 转移地址在内存：jmp word/dword ptr [adr]
+            if self.is_mem(self.opd[0]): # Target address in memory: jmp word/dword ptr [adr]
                 adr = self.get_address(self.opd[0])
                 if self.opbyte == 4:
                     self.opbyte = 2
                     self.write_reg('CS', self.get_int(adr + 2))
                 self.write_reg('IP', self.get_int(adr))
-            elif ':' in self.opd[0]:    # 长转移：jmp cs:ip
+            elif ':' in self.opd[0]:    # Far jump: jmp cs:ip
                 self.opd = [s for s in re.split(' |:', self.opd[0]) if s]
                 self.write_reg('CS', self.get_int(self.opd[0]))
                 self.write_reg('IP', self.get_int(self.opd[1]))
-            else:                     # 短转移、近转移、寄存器转移 jmp ip/reg
+            else:                     # Short jump, near jump, register jump: jmp ip/reg
                 self.write_reg('IP', self.get_int(self.opd[0]))
 
         elif self.opcode == 'LOOP':
@@ -773,7 +772,7 @@ class execution_unit(object):
             self.inc_reg('SP', 2)
 
         elif self.opcode in conditional_jump_ins:
-            # 所有条件转移都是短转移
+            # All conditional jumps are short jumps
             jmp_map = {
                 'JA':  self.FR.carry == 0 and self.FR.zero == 0,
                 'JAE': self.FR.carry == 0,
@@ -1048,7 +1047,7 @@ class execution_unit(object):
         else:
             sys.exit("operation code not support")
 
-    # execution_unit 中的方法
+    # execution_unit methods
     def flag_manipulation_ins(self):
         if self.opcode == 'STC':
             self.FR.carry = 1
@@ -1069,58 +1068,57 @@ class execution_unit(object):
         elif self.opcode == 'SANF':
             self.FR.set_low(self.read_reg('AH'))
         else:
-            sys.exit("operation code not support")
+            sys.exit("Operation code not supported")
 
     def input_output_ins(self):
         if self.opcode == 'IN':
             # Input from port into AL or AX. IN AX, 4; IN AL, 7;
-            # And we are not restricted to AL and AX, you can input to all regs.
-            port = to_decimal(self.opd[1])
+            # Supports all registers. Port can be immediate or DX.
+            port = self.get_int(self.opd[1]) if self.is_reg(self.opd[1]) else to_decimal(self.opd[1])
             val = to_decimal(input(f"Input to Port {port}: "))
             self.write_reg(self.opd[0], val)
         elif self.opcode == 'OUT':
             # Output from AL or AX to port. OUT 4, AX; OUT DX, AX
-            # And we are not restricted to AL and AX, you can output from all regs.
-            # If port > 255, use DX.
+            # If port > 255, DX is used.
             port = self.get_int(self.opd[0])
             val = self.read_reg(self.opd[1])
             self.print("> " * 16 + "@Port {}: 0x{:<4x} => {}\n".format(port, val, val))
         else:
-            sys.exit("operation code not support")
+            sys.exit("Operation code not supported")
 
     def dos_isr_21h(self):
         ah = self.read_reg('AH')
         al = self.read_reg('AL')
         if self.int_msg:
-            self.print(f"\n调用DOS中断例程21H，AH={hex(ah)}\n")
+            self.print(f"\nInvoking DOS Interrupt 21H, AH={hex(ah)}\n")
         if ah == 0x0:
             if self.int_msg:
-                self.print("中断例程功能：程序终止\n")
+                self.print("Interrupt Routine: Program Terminate\n")
             self.print("> " * 16 + "Exit to operating system")
             self.shutdown = True
 
         elif ah == 0x01:
             if self.int_msg:
-                self.print("中断例程功能：键盘键入并回显\n")
+                self.print("Interrupt Routine: Keyboard Input with Echo\n")
             char = input()[0]
-            self.write_reg('AL', ord(char)) # ascii存储
+            self.write_reg('AL', ord(char)) # Store ASCII
         
         elif ah == 0x02:
             if self.int_msg:
-                self.print("中断例程功能：显示输出\n")
+                self.print("Interrupt Routine: Character Output\n")
             char = chr(self.read_reg('DL'))
             self.print('> '+ char + '\n')
 
-        elif ah == 0x9: # 显示字符串DS:DX=串地址 ‘$’结束字符串
+        elif ah == 0x9: # Display string DS:DX=string address, '$' terminated
             if self.int_msg:
-                self.print("中断例程功能：显示字符串\n")
+                self.print("Interrupt Routine: Display String\n")
             address = (self.read_reg('DS') << 4) + self.read_reg('DX')
             count = 0
-            self.print("> " * 16)     # '>'提示cpu输出
+            self.print("> " * 16)     # '>' prompt for CPU output
 
             while True:
                 char = self.__get_char(address)
-                if char == '$' or count == 500: # 如果不结束，达到500上限则停止。
+                if char == '$' or count == 500: # Stop if '$' or 500 character limit reached
                     break
                 # print(address)
                 self.print(char)
@@ -1128,17 +1126,17 @@ class execution_unit(object):
                 count += 1
             self.print('\n')
 
-        elif ah == 0x2a: # 取日期：CX:DH:DL=年:月:日
+        elif ah == 0x2a: # Get date: CX:DH:DL=Year:Month:Day
             if self.int_msg:
-                self.print("中断例程功能：读取系统日期\n")
+                self.print("Interrupt Routine: Read System Date\n")
             now = datetime.datetime.now()
             self.write_reg('CX', now.year)
             self.write_reg('DH', now.month)
             self.write_reg('DL', now.day)
 
-        elif ah == 0x2c: # 取时间：CH:CL=时:分 DH:DL=秒:1/100秒
+        elif ah == 0x2c: # Get time: CH:CL=Hour:Minute, DH:DL=Second:1/100 Second
             if self.int_msg:
-                self.print("中断例程功能：读取系统时间\n")
+                self.print("Interrupt Routine: Read System Time\n")
             now = datetime.datetime.now()
             self.write_reg('CH', now.hour)
             self.write_reg('CL', now.minute)
@@ -1147,14 +1145,14 @@ class execution_unit(object):
         
         elif ah == 0x35:
             if self.int_msg:
-                self.print("中断例程功能：取中断向量\n")
+                self.print("Interrupt Routine: Get Interrupt Vector\n")
             int_type = self.read_reg('AL')
             self.write_reg('BX', self.get_int_from_adr(int_type * 4))
             self.write_reg('ES', self.get_int_from_adr(int_type * 4 + 2))
         
         elif ah == 0x4c: # Exit with return code
             if self.int_msg:
-                self.print("中断例程功能：带返回值结束\n")
+                self.print("Interrupt Routine: Terminate with Return Code\n")
             self.print(f"\nExit with return code {al}\n")
             self.shutdown = True
 
@@ -1165,7 +1163,7 @@ class execution_unit(object):
         pass
 
     def interrupt_handler(self, int_type):
-        self.inc_reg('SP', -2) # 保护现场
+        self.inc_reg('SP', -2) # Save context
         self.write_mem(self.ss_sp, self.FR.get_int())
         self.FR.trap = 0
         self.FR.interrupt = 0
@@ -1179,24 +1177,24 @@ class execution_unit(object):
         self.write_reg('IP', ip_val)
         self.write_reg('CS', cs_val)
         if self.int_msg:
-            self.print(f"执行{hex(int_type)}号中断...\n")
-            self.print("保护现场成功\n")
-            self.print(f"读取中断向量表 {hex(int_type * 4)} 处偏移地址 {hex(ip_val)} => IP\n")
-            self.print(f"读取中断向量表 {hex(int_type * 4 + 2)} 处段地址 {hex(cs_val)} => CS\n")
-            self.print("进入中断例程...\n")
+            self.print(f"Executing Interrupt {hex(int_type)}...\n")
+            self.print("Context saved successfully\n")
+            self.print(f"Read IVT at {hex(int_type * 4)}: Offset {hex(ip_val)} => IP\n")
+            self.print(f"Read IVT at {hex(int_type * 4 + 2)}: Segment {hex(cs_val)} => CS\n")
+            self.print("Entering Interrupt Service Routine...\n")
 
     def miscellaneous_ins(self): 
         if self.opcode == 'NOP':
             pass
         elif self.opcode == 'INT':
-            # print('中断开始')
+            # Interrupt start
             if not self.opd:
-                self.print("\n断点中断\n")
+                self.print("\nBreakpoint Interrupt (INT 3)\n")
                 self.interrupt = True
             else:
                 int_type = to_decimal(self.opd[0])
-                if int_type == 3: # 断点
-                    self.print("\n断点中断\n")
+                if int_type == 3: # Breakpoint
+                    self.print("\nBreakpoint Interrupt (INT 3)\n")
                     self.interrupt = True
                 elif int_type == to_decimal('10H'):
                     self.bios_isr_10h()
@@ -1209,7 +1207,7 @@ class execution_unit(object):
 
         elif self.opcode == 'IRET':
             if self.int_msg:
-                self.print("中断例程结束，恢复现场中...\n")
+                self.print("Interrupt Routine finished, restoring context...\n")
             self.opcode = 'POP'
             self.opd = ['IP']
             self.control_circuit()
@@ -1221,7 +1219,7 @@ class execution_unit(object):
             self.opcode = 'POPF'
             self.control_circuit()
             if self.int_msg:
-                self.print("恢复现场成功\n")
+                self.print("Context restored successfully\n")
 
         elif self.opcode == 'XLAT':
             pass
@@ -1237,4 +1235,4 @@ class execution_unit(object):
         elif self.opcode == 'WAIT':
             pass
         else:
-            sys.exit("operation code not support")
+            sys.exit("Operation code not supported")

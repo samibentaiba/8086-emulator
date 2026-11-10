@@ -62,17 +62,17 @@ class CPU(object):
         
 
     def fetch_cycle(self):
-        # Instruction fetch cycle 取指令周期
+        # Instruction fetch cycle
         self.BIU.run()
         pass
 
     def execute_cycle(self):
-        # Instruction execution cycle 执行周期
+        # Instruction execution cycle
         self.EU.run()
         pass
     
     def check_done(self):
-        # 检查是否无指令，结束cpu运行
+        # Check if there are no more instructions to stop CPU execution
         if self.EU.interrupt or self.EU.shutdown:
             return True
         return  self.BIU.instruction_queue.empty() and \
@@ -103,20 +103,20 @@ class CPU(object):
         pprint(self.BIU.memory.space[begin: end], compact=True)
 
     def print_state(self):
-        # 打印运行时状态
+        # Print runtime state
         print("\nPipeline:")
         pprint(list(self.BIU.instruction_queue.queue))
         print("\nMemory of CS:IP:")
         self.show_memory(self.BIU.cs_ip, self.BIU.cs_ip + 10)
         print("\nMemory of DS:")
         self.show_memory(self.BIU.reg['DS']*16, self.BIU.reg['DS']*16 + 40)
-        print("\nPegisters:")
+        print("\nRegisters:")
         self.show_regs()
         print("\nIR:  ", self.EU.IR)
         print("Next:", self.BIU.next_ins)
         print('-' * 80)
     
     def print_end_state(self):
-        # 打印结束状态
+        # Print termination state
         self.EU.print("Clock ended\n")
         self.EU.print(f"CPU ran a total of {self.cycle_count} clock cycles\n")

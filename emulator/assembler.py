@@ -39,28 +39,28 @@ def to_decimal(num):
     return res
 
 class Assembler(object):
-    # 汇编器 Actually It's an Interpreter :)
+    # Assembler (Actually an Interpreter)
     def __init__(self, seg):
         self.name = ''
         self.title = ''
-        self.space = {} # 段空间
+        self.space = {} # Segment space
         self.seg_adr = {'DS': hex(seg['DS']), 'CS': hex(seg['CS']), 'SS': hex(seg['SS']), 'ES': hex(seg['ES'])}
-        self.seg_id = {} # 段名
-        self.seg_len = {} # 段实际长度
-        self.tags = {} # 标号
-        self.vars = {} # 变量
-        self.ip = '0'    # 程序入口offset
-        self.ins_origin = [] # 未转换和分割的原始指令
+        self.seg_id = {} # Segment name
+        self.seg_len = {} # Segment actual length
+        self.tags = {} # Labels
+        self.vars = {} # Variables
+        self.ip = '0'    # Program entry offset
+        self.ins_origin = [] # Raw unparsed instructions
 
     def compile(self, code):
         instructions = self.__preprocessing(code)
         for ip in range(len(instructions)):
             ins = instructions[ip]
-            if ins[0] == 'NAME': # 模块名
+            if ins[0] == 'NAME': # Module name
                 self.name = ins[1] 
-            elif ins[0] == 'TITLE': # 文件名
+            elif ins[0] == 'TITLE': # File name
                 self.title = ins[1]
-            elif ins[0] == 'ASSUME': # ASSUME必须在段之前
+            elif ins[0] == 'ASSUME': # ASSUME must precede segments
                 self.__assume(ins[1:])
             elif len(ins) > 1 and ins[1] == 'SEGMENT':
                 ip = self.__segment(instructions, ip)
@@ -83,23 +83,23 @@ class Assembler(object):
         return self
 
     def __eval_id(self):  #TODO(Zubin) make it simple
-        # 给出标号（用于jmp loop）和变量
+        # Resolve labels (for jmp/loop) and variables
         var_dict = {}
         for key, val in self.seg_id.items():
-            var_dict[key] = str(self.seg_adr[val]) # 段名解释为段地址
+            var_dict[key] = str(self.seg_adr[val]) # Resolve segment name to segment address
         for key, val in self.vars.items():
-            # var_dict[key] = hex(int(val['seg'], 16) * 16 + int(val['offset'], 16)) # 变量解释为真实地址
+            # var_dict[key] = hex(int(val['seg'], 16) * 16 + int(val['offset'], 16)) # Physical address
             for k, v in self.seg_adr.items():
                 if v == val['seg']:
                     seg_name = k
-            var_dict[key] = seg_name + ':[' + str(hex(int(val['offset'], 16))) + ']' # 变量解释为“段地址：偏移地址”
+            var_dict[key] = seg_name + ':[' + str(hex(int(val['offset'], 16))) + ']' # "segment:offset"
         # print("var_dict:", var_dict)
-        for key, val in self.space.items(): # 遍历每个段
-            for i in range(len(self.space[key])): # 遍历每行代码
+        for key, val in self.space.items(): # Traverse each segment
+            for i in range(len(self.space[key])): # Traverse each line of code
                 ins = self.space[key][i]
                 if ins:
                     if ins[0] in transfer_control_ins and ins[-1] in self.tags.keys():
-                        # jmp/call 空/short tag -> jmp/call tag.offset
+                        # jmp/call short/empty tag -> jmp/call tag.offset
                         # loop/jcxz tag -> loop/jcxz tag.offset
                         # jmp/call near ptr tag -> jmp/call tag.offset
                         # jmp/call far ptr tag -> jmp/call tag.seg:tag.offset
@@ -121,19 +121,19 @@ class Assembler(object):
                                     self.space[key][i][j] = self.vars[ins[j]][s.lower()] 
                                 else:
                                     self.space[key][i][j] = self.tags[ins[j]][s.lower()] 
-                        # 替换变量和标号
+                        # Replace variables and labels
                         for k, v in var_dict.items():
                             if ins[j] == k:
                                 self.space[key][i][j] = v
                             elif ins[j][:len(k)] == k and ins[j][len(k)] == '[':
                                 self.space[key][i][j] = v + ins[j][len(k):]
                         j += 1
-                        # 变量：MOV BX,A[SI]  A = a.seg*16 + a.offset
-                        # 变量：add ax, Item  Item = [a.seg*16 + a.offset]
-                        # 段名：MOV AX,DRG    ORG = org.seg
+                        # Variable: MOV BX,A[SI]  A = a.seg*16 + a.offset
+                        # Variable: add ax, Item  Item = [a.seg*16 + a.offset]
+                        # Segment name: MOV AX,DRG    ORG = org.seg
 
     def __segment(self, instructions, ip):
-        seg_ip = 0  # 当前段偏移量，即'$' 
+        seg_ip = 0  # Current segment offset, i.e., '$'
         seg_ins = instructions[ip]
         seg_tmp = seg_ins[0]
         seg_name = self.seg_id[seg_tmp] # CS DS SS ES
@@ -142,22 +142,22 @@ class Assembler(object):
             ins = instructions[i]
             for j in range(len(ins)):
                 if ins[j] == '$':
-                    ins[j] == str(hex(seg_ip))
+                    ins[j] = str(hex(seg_ip))
             ins_ori = self.ins_origin[i]
             if ins[0] == 'ORG':
                 seg_ip = to_decimal(ins[1])
-            elif ins[0] == 'EVEN': # 下面的内存变量从下一个偶地址单元开始分配
+            elif ins[0] == 'EVEN': # Align next memory variable to even address
                 seg_ip += seg_ip % 2
             elif ins[0] == 'ALIGN':
                 num = to_decimal(ins[1])
-                assert num & (num-1) == 0, "Num should be power of 2"  # num为2的幂
+                assert num & (num-1) == 0, "Num should be power of 2"  # num is power of 2
                 seg_ip += (-seg_ip) % num 
             elif ins[0] == seg_tmp:
                 assert ins[1] == 'ENDS', "Compile Error: segment ends fault"
                 self.seg_len[seg_name] = seg_ip
                 return i + 1
 
-            elif ':' in ins[0]: # 数据标号
+            elif ':' in ins[0]: # Data label
                 tag_list = ins[0].split(':')
                 tag = tag_list[0]
                 self.tags[tag] = {'seg': self.seg_adr[seg_name],
@@ -167,13 +167,13 @@ class Assembler(object):
                     pass
                 else:
                     if tag_list[1]:                 # case2: start:mov ...
-                        ins[0] = tag_list[1] # 去掉标号
+                        ins[0] = tag_list[1] # Strip label
                     else:                           # case3: start: mov ... 
-                        ins = ins[1:] # 去掉标号
+                        ins = ins[1:] # Strip label
                     self.space[seg_name][seg_ip] = ins
                     seg_ip += 1
             
-            elif ins[0] in data_def_ins: # 数据定义伪指令
+            elif ins[0] in data_def_ins: # Data definition pseudo-instruction
                 byte_list = self.__data_define(ins, ins_ori)
                 self.space[seg_name][seg_ip:seg_ip+len(byte_list)] = byte_list
                 seg_ip += len(byte_list)
@@ -182,11 +182,11 @@ class Assembler(object):
                 self.vars[var] = {'seg': self.seg_adr[seg_name],
                                   'offset': hex(seg_ip),
                                   'type': 0}      # TODO(Zubin) set type
-                var_ori = ins_ori.split()[0] # 实际的变量名（未转换大小写）
+                var_ori = ins_ori.split()[0] # Actual variable name (preserve case)
                 byte_list = self.__data_define(ins[1:], ins_ori.replace(var_ori, '', 1).strip())
                 self.space[seg_name][seg_ip:seg_ip+len(byte_list)] = byte_list
                 seg_ip += len(byte_list)
-            else: # 没有数据标号的汇编指令 直接送入段空间
+            else: # Assembly instruction without data label; emit directly to segment space
                 self.space[seg_name][seg_ip] = ins
                 seg_ip += 1
 

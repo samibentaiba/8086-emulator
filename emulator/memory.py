@@ -29,7 +29,7 @@ class Memory(object):
         self.space[loc] = content
         
     def load(self, exe):
-        # 加载器
+        # Program loader
         self.refresh()
         print("loading assembly code to memory...")
         for seg, val in exe.space.items():
@@ -37,7 +37,7 @@ class Memory(object):
             print(hex(adr))
             self.space[adr: adr + self.seg_size] = val
             print(self.space[adr:adr+100])
-        # 加载中断向量表和中断例程
+        # Load interrupt vector table and interrupt service routines
         load_isr(self)
         print("successfully loaded!")
         print()
@@ -48,7 +48,7 @@ class Memory(object):
 
 
 # class Cache_memory(Memory):
-#     # 高速缓存
+#     # Cache memory
 #     def __init__(self, max_space):
 #         super(Cache_memory, self).__init__(max_space, 0)
 

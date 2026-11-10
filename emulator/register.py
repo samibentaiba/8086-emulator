@@ -1,7 +1,7 @@
 import sys
 
 # class General_register(object):
-#     # 通用寄存器
+#     # General Purpose Registers
 #     def __init__(self, list):
 #         self.list = list
 #         self.reg_count = len(list)
@@ -111,16 +111,16 @@ import sys
 #         return self & 0xff
 
 #     def write_high(self, num):
-#         # 此处应有操作数检查
+#         # Operand validation check here
 #         return (self & 0xff) + (num << 8)
 
 #     def write_low(self, num):
-#         # 此处应有操作数检查
+#         # Operand validation check here
 #         return (self & 0xff00) + num
 
 class Flag_register(object):
-    # 标志寄存器
-    # 16bits的标志寄存器，其中9个比特是被使用的，另外7个比特保留未用
+    # Flag register
+    # 16-bit flag register where 9 bits are active and 7 bits are reserved
     def __init__(self):
         # status flags
         self.sign = 0       # S
@@ -171,7 +171,7 @@ class Flag_register(object):
         return self.reg[name]
         
 # class Register_file(object):
-#     # 寄存器堆
+#     # Register file
 #     def __init__(self, DS_START, CS_START, SS_START, ES_START):
 #         # General Purpose Registers
 #         self.GR = General_register(["AX","BX","CX","DX"])
