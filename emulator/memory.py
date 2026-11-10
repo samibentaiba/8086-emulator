@@ -28,19 +28,23 @@ class Memory(object):
         self.verify(loc)
         self.space[loc] = content
         
-    def load(self, exe):
+    def load(self, exe, verbose=False):
         # Program loader
         self.refresh()
-        print("loading assembly code to memory...")
+        if verbose:
+            print("loading assembly code to memory...")
         for seg, val in exe.space.items():
             adr = int(exe.seg_adr[seg], 16) * 16
-            print(hex(adr))
+            if verbose:
+                print(hex(adr))
             self.space[adr: adr + self.seg_size] = val
-            print(self.space[adr:adr+100])
+            if verbose:
+                print(self.space[adr:adr+100])
         # Load interrupt vector table and interrupt service routines
-        load_isr(self)
-        print("successfully loaded!")
-        print()
+        load_isr(self, verbose=verbose)
+        if verbose:
+            print("successfully loaded!")
+            print()
 
         
     def refresh(self):

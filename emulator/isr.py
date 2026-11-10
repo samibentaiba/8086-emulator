@@ -17,9 +17,10 @@ def load_ivt(memory): # load Interrupt Vector Table
         memory.wb(i * 4 + 2, [str(hex(i % 16)) + '0'])  # CS
         memory.wb(i * 4 + 3, ['0x1' + str(hex(i // 16))[-1]])
 
-def load_isr(memory):
+def load_isr(memory, verbose=False):
     load_ivt(memory)
-    print("loading ISR...")
+    if verbose:
+        print("loading ISR...")
 
     for i in ['0', '1', '2', '3', '4', '7c']:
         assembler = Assembler(SEG_INIT)

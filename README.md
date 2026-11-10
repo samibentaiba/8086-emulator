@@ -1,15 +1,34 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-42%2F42%20passing-brightgreen)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-50%2F50%20passing-brightgreen)
 
-An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive Neovim/GDB-style Terminal User Interface (TUI), a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
+An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive LazyVim/Neovim-style Terminal User Interface (TUI) with a built-in modal code editor, a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
 > 🤖 **Working with an AI coding assistant?** Check out [`AGENTS.md`](AGENTS.md) for a comprehensive architecture map, instruction lifecycle trace, peripheral specs, and developer guidelines.
 
 ---
 
-## What's New in v5.1 & v5.0 (Major Overhaul)
+## What's New in v5.2 (LazyVim Modal Editor & Zero-Glitch Overhaul)
+- **LazyVim-Style In-TUI Modal Code Editor**: Write, navigate, and edit assembly code directly inside the TUI with `NORMAL` vs `INSERT` modes:
+  - `i`: Insert at cursor, `a`: Append after cursor, `O`: Open new line.
+  - `x`: Delete character under cursor, `d`: Delete active line.
+  - `<Esc>`: Exit insert mode and trigger instant on-the-fly reassembly and live memory reload.
+  - `<Space>w`: Save source file changes directly back to disk.
+- **Exact 1-to-1 Debug Symbol Tracking**: Deterministic mapping (`ip_to_source_line`) ensures that exactly **one** line is highlighted with the execution pointer `▶` at any clock cycle, eliminating multi-line highlighting glitches.
+- **Zero-Glitch Terminal Canvas**: Complete elimination of terminal tearing and ghost artifacts via mathematical bounding-box clipping (`max_w = w - 2`), `stdscr.clear()` double-buffered transitions on layout shifts, and silent stdout isolation.
+- **LazyVim Window Management & Which-Key Menu**:
+  - `<Space>`: Floating Which-Key popup menu listing all keybindings and commands.
+  - `1` / `2` / `3` / `4`: Direct jump to Code Editor, Registers, Telemetry, or Inspector.
+  - `w` / `Tab`: Cycle active focus across windows.
+  - `z`: Maximize / zoom active window to full screen.
+  - `t`: Show / hide Virtual Hardware Telemetry pane.
+  - `v` / `o`: Toggle inspector between Hex Dump, Stack View, and Program Console Output.
+- **50 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, and the in-TUI modal code editor.
+
+---
+
+## What's New in v5.1 & v5.0
 - **TUI Stack Viewer (`[v]` toggle)**: Real-time inspection of the active call stack (`SS:SP`) showing physical memory addresses, 16-bit word values, and SP offsets directly inside the Memory Inspector pane.
 - **Modern Packaging & CLI Entrypoints (`pyproject.toml`)**: Install via `pip install -e .` and invoke tools globally via `emu8086` and `emu8086-tui`.
 - **Extended Assembler Directives**: Support for `EQU` symbolic constants, `PROC`/`ENDP` procedure blocks, and resilient `ASSUME` pre-scanning.
@@ -57,22 +76,39 @@ python3 main.py ./tests/Requirement/bubble_sort.asm -t
 - **Virtual Hardware Telemetry**: Live status of Port 4 Traffic Lights, Port 7 Stepper Motor (with rotating compass needle), CGA 0xB8000 video buffer cursor, and console log.
 - **Memory Inspector**: Real-time hex dump and ASCII decoding for `DS`, `CS`, `SS`, `ES`, or `VIDEO` (`0xB8000`) memory regions.
 
-#### TUI Keybindings
-| Key | Action |
+#### TUI Keybindings & Modal Editor
+| Mode / Key | Action |
 |:---:|:---|
-| `s` / `Space` / `Enter` | Single-step forward by one instruction |
+| **Modal Editing** | |
+| `i` / `I` | Enter **INSERT** mode (edit code at cursor) |
+| `a` / `A` | Enter **INSERT** mode (append character after cursor) |
+| `O` | Open new blank line below cursor in INSERT mode |
+| `<Esc>` | Exit INSERT mode, reassemble on-the-fly, and reload CPU memory |
+| `x` / `X` | Delete character under cursor (in NORMAL mode) |
+| `d` / `D` | Delete active source line (in NORMAL mode) |
+| `<Space>w` | Save source file changes directly back to disk |
+| **Execution & Debugging** | |
+| `s` / `Enter` | Single-step forward by one instruction |
 | `c` | Continue running continuously |
 | `p` | Pause continuous execution |
-| `b` | Toggle breakpoint on the selected instruction |
-| `Tab` | Switch active focus between **Disassembly** and **Memory Inspector** |
-| `j` / `Down` | Move selection down (Disassembly) or scroll memory down (+16 bytes) |
-| `k` / `Up` | Move selection up (Disassembly) or scroll memory up (-16 bytes) |
-| `Page Down` / `Page Up` | Scroll memory by 128 bytes |
-| `m` | Cycle memory segment (`DS` $\rightarrow$ `CS` $\rightarrow$ `SS` $\rightarrow$ `ES` $\rightarrow$ `VIDEO`) |
-| `v` | Toggle Memory Inspector view mode (**Hex Dump** $\leftrightarrow$ **Stack View**) |
+| `b` | Toggle breakpoint on the selected instruction or source line |
 | `r` | Reset CPU and reload assembly program to initial state |
 | `+` / `-` | Increase / decrease continuous execution speed |
-| `?` / `h` | Display help tooltip |
+| **LazyVim Window Controls** | |
+| `Space` | Open floating **Which-Key** menu palette |
+| `1` / `2` / `3` / `4` | Direct jump to **[1: Code]**, **[2: Registers]**, **[3: Telemetry]**, **[4: Inspector]** |
+| `w` / `W` / `Tab` | Cycle active window focus forward / backward |
+| `z` | Maximize / zoom active window to full screen (toggle) |
+| `t` | Show / hide Hardware Telemetry pane |
+| `v` | Cycle inspector mode (**Hex Dump** $\rightarrow$ **Stack View** $\rightarrow$ **Console Output**) |
+| `o` | Direct jump to **Program Console Output** inspector |
+| `m` | Cycle memory segment (`DS` $\rightarrow$ `CS` $\rightarrow$ `SS` $\rightarrow$ `ES` $\rightarrow$ `VIDEO`) |
+| **Navigation** | |
+| `h` / `l` | Move cursor left / right within source line |
+| `j` / `k` / `Down` / `Up` | Move cursor down / up (Code Editor) or scroll memory ($\pm 16$ bytes) |
+| `g` / `G` | Jump to beginning / end of source code or memory |
+| `Page Down` / `Page Up` | Page scroll editor / memory (128 bytes) |
+| `?` | Display Help modal tooltip |
 | `q` | Cleanly exit TUI and restore terminal state |
 
 ---
