@@ -9,6 +9,7 @@ class Memory(object):
         self.max_space = max_space
         self.seg_size = seg_size
         self.space = [['0']] * self.max_space
+        self.write_listener = None
 
     def is_null(self, loc):
         return self.space[loc] == ['0']
@@ -26,6 +27,8 @@ class Memory(object):
     def wb(self, loc, content):
         # content is a list
         self.verify(loc)
+        if getattr(self, 'write_listener', None) is not None:
+            self.write_listener(loc, self.space[loc])
         self.space[loc] = content
         
     def load(self, exe, verbose=False):

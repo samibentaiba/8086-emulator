@@ -309,7 +309,8 @@ class VideoDisplayDevice(object):
         for r in range(VIDEO_ROWS - lines):
             src = VIDEO_MEM_BASE + (r + lines) * row_bytes
             dst = VIDEO_MEM_BASE + r * row_bytes
-            self.memory.space[dst:dst + row_bytes] = self.memory.space[src:src + row_bytes]
+            for offset in range(row_bytes):
+                self.memory.wb(dst + offset, self.memory.space[src + offset])
 
         # Blank out bottom rows
         for r in range(VIDEO_ROWS - lines, VIDEO_ROWS):

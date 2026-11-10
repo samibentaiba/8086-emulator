@@ -48,7 +48,8 @@ class EmulatorTUI:
         self.show_leader_menu = False
         self.step_delay = 0.05  # seconds between steps in run mode
         self.last_step_time = 0
-        self.status_msg = "NORMAL mode. Press [i] to Edit, [Space] for Which-Key, [s] to Step, [c] to Run."
+        self.running_direction = 1  # 1 for forward, -1 for backward (rewind)
+        self.status_msg = "NORMAL mode. Press [i] to Edit, [s] to Step, [u] to Step Back, [c] to Run, [C] to Rewind."
 
         # LazyVim Modal Editor state
         self.mode = 'NORMAL'          # 'NORMAL' or 'INSERT'
@@ -153,6 +154,7 @@ class EmulatorTUI:
         self._cache_instructions()
         self.prev_regs = self._snapshot_regs()
         self.running = False
+        self.running_direction = 1
         self.disasm_cursor_idx = 0
         self.follow_ip = True
 
@@ -229,6 +231,37 @@ class EmulatorTUI:
         else:
             self.running = False
             self.status_msg = f"Program terminated. Cycles: {self.cpu.cycle_count}."
+            return False
+
+    def step_back(self):
+        """Rewind CPU state by 1 instruction, reverting registers, memory, and flags."""
+        if not self.cpu.can_step_back():
+            self.running = False
+            self.status_msg = "Already at start of execution (Cycle 0)."
+            return False
+
+        old_regs = self._snapshot_regs()
+        if self.cpu.step_back():
+            self.prev_regs = old_regs  # Reverted registers and flags will highlight in yellow!
+            current_ip = self.BIU.reg.get('IP', 0)
+            if self.follow_ip:
+                for idx, (offset, opc, _) in enumerate(self.instructions):
+                    if offset == current_ip:
+                        self.disasm_cursor_idx = idx
+                        break
+                if current_ip in self.ip_to_source_line:
+                    self.edit_row = self.ip_to_source_line[current_ip]
+
+            if current_ip in self.breakpoints:
+                self.running = False
+                self.status_msg = f"Reverse breakpoint hit at IP={current_ip:04X}h!"
+            else:
+                undone_line = self.source_lines[self.edit_row].strip() if self.edit_row < len(self.source_lines) else ""
+                self.status_msg = f"⏪ Stepped back to IP={current_ip:04X}h (Cycle {self.cpu.cycle_count}): {undone_line}"
+            return True
+        else:
+            self.running = False
+            self.status_msg = "Already at start of execution (Cycle 0)."
             return False
 
     def run(self):
@@ -391,11 +424,16 @@ class EmulatorTUI:
 
                 stdscr.refresh()
 
-                # Handle Continuous Running
+                # Handle Continuous Running (Forward or Backward)
                 if self.running and self.mode == 'NORMAL':
                     now = time.time()
                     if now - self.last_step_time >= self.step_delay:
-                        self.step()
+                        if getattr(self, 'running_direction', 1) == -1:
+                            if not self.step_back():
+                                self.running = False
+                        else:
+                            if not self.step():
+                                self.running = False
                         self.last_step_time = now
 
                 # Process User Input Keybindings
@@ -408,8 +446,16 @@ class EmulatorTUI:
             sys.stderr = old_stderr
 
     def _render_header(self, win, max_x):
-        state_str = "RUNNING" if self.running else ("HALTED" if self.cpu.check_done() else "PAUSED")
-        state_color = curses.color_pair(2) if self.running else (curses.color_pair(4) if self.cpu.check_done() else curses.color_pair(3))
+        if self.running:
+            if getattr(self, 'running_direction', 1) == -1:
+                state_str = "REWIND ◀◀"
+                state_color = curses.color_pair(3)
+            else:
+                state_str = "RUNNING ▶▶"
+                state_color = curses.color_pair(2)
+        else:
+            state_str = "HALTED" if self.cpu.check_done() else "PAUSED"
+            state_color = curses.color_pair(4) if self.cpu.check_done() else curses.color_pair(3)
 
         parts = self.asm_filepath.replace('\\', '/').split('/')
         filename = '/'.join(parts[-2:]) if len(parts) > 2 else self.asm_filepath
@@ -828,9 +874,11 @@ class EmulatorTUI:
             status_line = f" INSERT │ Ln {self.edit_row + 1}, Col {self.edit_col + 1} │ MSG: {self.status_msg}"
             self._safe_addstr(win, max_y - 1, 0, status_line.ljust(max_x), curses.color_pair(3))
         else:
-            hotkeys = " [Space] Leader  [i] Edit  [s] Step  [c] Run  [p] Pause  [z] Zoom  [t] Telem  [o/v] View  [?] Help  [q] Quit"
+            hist_count = len(self.cpu.history) if hasattr(self.cpu, 'history') else 0
+            hist_tag = f" [Rev:{hist_count}]" if hist_count > 0 else ""
+            hotkeys = " [Space] Which-Key  [i] Edit  [s] Step  [u] Step Back  [c] Run  [C] Rewind  [p] Pause  [z] Zoom  [?] Help  [q] Quit"
             self._safe_addstr(win, max_y - 2, 0, f"{hotkeys}".ljust(max_x), curses.color_pair(6) | curses.A_BOLD)
-            status_line = f" NORMAL │ [{self.focused_pane.upper()}] Ln {self.edit_row + 1}, Col {self.edit_col + 1} │ MSG: {self.status_msg}"
+            status_line = f" NORMAL │ [{self.focused_pane.upper()}] Ln {self.edit_row + 1}, Col {self.edit_col + 1}{hist_tag} │ MSG: {self.status_msg}"
             self._safe_addstr(win, max_y - 1, 0, status_line.ljust(max_x), curses.color_pair(3))
 
     def _render_leader_menu(self, win, max_y, max_x):
@@ -847,8 +895,8 @@ class EmulatorTUI:
         self._draw_box(win, start_y, start_x, menu_h, menu_w, "WHICH-KEY (Space Leader)", True)
 
         commands = [
-            [("s", "Step 1"), ("c", "Run Continuous"), ("p", "Pause"), ("b", "Toggle Break")],
-            [("i", "Insert Mode"), ("a", "Append Mode"), ("w", "Save to Disk"), ("z", "Zoom Window")],
+            [("s", "Step Fwd"), ("u", "Step Back"), ("c", "Run Fwd"), ("C", "Run Back")],
+            [("p", "Pause"), ("b", "Toggle Break"), ("w", "Save to Disk"), ("z", "Zoom Window")],
             [("t", "Toggle Telem"), ("o", "Console Output"), ("v", "Stack View"), ("r", "Reset CPU")]
         ]
 
@@ -888,9 +936,12 @@ class EmulatorTUI:
             ("  [w] / [Tab]       Cycle active window forward ([W] backward)", False),
             ("  [o] / [v]         Cycle inspector: Hex Dump <-> Stack <-> Console", False),
             ("", False),
-            ("Debugging & Motions:", True),
-            ("  [s] / [Enter]     Single-step one instruction forward", False),
-            ("  [c] / [p]         Continue running / Pause execution", False),
+            ("Execution & Time-Travel Debugging:", True),
+            ("  [s] / [Enter]     Single-step 1 instruction forward", False),
+            ("  [u] / [Bksp]      Single-step 1 instruction backward (Undo step)", False),
+            ("  [c]               Run forward continuously", False),
+            ("  [C] / [U]         Run backward continuously (Rewind to break/start)", False),
+            ("  [p]               Pause forward or backward execution", False),
             ("  [b] / [r]         Toggle breakpoint / Reset CPU to Cycle 0", False),
             ("  [k] / [j]         Move up / down line by line", False),
             ("  [g] / [G]         Jump to top / bottom of code", False),
@@ -1148,15 +1199,26 @@ class EmulatorTUI:
             self.need_full_clear = True
             self.status_msg = f"Inspector mode: [{self.mem_view_mode.upper()}]."
 
-        # Step and run
+        # Step and run forward / backward
         elif key in [ord('s'), ord('S'), ord('\n'), 10]:
             self.running = False
             self.follow_ip = True
             self.step()
 
-        elif key in [ord('c'), ord('C')]:
+        elif key in [ord('u'), curses.KEY_BACKSPACE, ord('\b'), 127, 8]:
+            self.running = False
+            self.follow_ip = True
+            self.step_back()
+
+        elif key in [ord('c')]:
             self.running = True
-            self.status_msg = "Running continuously... Press [p] to pause."
+            self.running_direction = 1
+            self.status_msg = "▶ Running continuously forward... Press [p] to pause."
+
+        elif key in [ord('C'), ord('U')]:
+            self.running = True
+            self.running_direction = -1
+            self.status_msg = "◀ Running continuously backward (Rewinding)... Press [p] to pause."
 
         elif key in [ord('p'), ord('P')]:
             self.running = False

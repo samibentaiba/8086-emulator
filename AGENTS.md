@@ -3,7 +3,7 @@
 > **Target Audience**: AI Coding Assistants (Antigravity, Claude Code, Cursor, Copilot, Codex, Gemini) and human contributors maintaining or extending this Intel 8086 emulator fork.
 > **Repository**: [`samibentaiba/8086-emulator`](https://github.com/samibentaiba/8086-emulator.git)  
 > **Original Base**: ZubinGou/8086-emulator  
-> **Current Version**: `v5.2.0` (LazyVim Modal Editor, 1-to-1 Execution Tracking, Zero-Glitch TUI, 53 Unit Tests)
+> **Current Version**: `v5.2.0` (LazyVim Modal Editor, Time-Travel Reverse Debugging, 1-to-1 Execution Tracking, Zero-Glitch TUI, 63 Unit Tests)
 
 ---
 
@@ -174,7 +174,7 @@ When editing or extending this codebase, adhere strictly to these rules:
    - Never use `sys.exit("Compile Error")` or bare `assert` for syntax errors. Raise `AssemblyError(message, line, source)`.
 5. **Decoupled Peripheral Architecture**:
    - Do not hardcode peripheral state inside `execution_unit.py`. Route I/O port reads/writes through `self.peripherals.read_port(port)` and `self.peripherals.write_port(port, value)`.
-6. **All 53 Unit Tests Must Pass**:
+6. **All 63 Unit Tests Must Pass**:
    - Always run `python3 -m unittest discover tests` before pushing commits.
 
 ---
@@ -185,7 +185,7 @@ When editing or extending this codebase, adhere strictly to these rules:
 ```bash
 python3 -m unittest discover tests
 ```
-*Expected result: 53 tests passing in under 45 seconds.*
+*Expected result: 63 tests passing in under 55 seconds.*
 
 ### Run CLI Verification
 ```bash

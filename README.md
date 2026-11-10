@@ -1,7 +1,7 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-53%2F53%20passing-brightgreen)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-63%2F63%20passing-brightgreen)
 
 An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive LazyVim/Neovim-style Terminal User Interface (TUI) with a built-in modal code editor, a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
@@ -9,7 +9,13 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 
 ---
 
-## What's New in v5.2 (LazyVim Modal Editor & Zero-Glitch Overhaul)
+## What's New in v5.2 (LazyVim Modal Editor, Time-Travel Debugging & Zero-Glitch Overhaul)
+- **Time-Travel Reverse Debugging ("Step Back" & "Run Backward")**:
+  - `u` / `<Backspace>`: Single-step backward (rewind 1 instruction). Restores previous CPU registers, flags, stack, memory writes, and peripheral states. Reverted registers automatically highlight in bright yellow.
+  - `C` / `U`: Run backward continuously (rewind until start or breakpoint).
+  - **Reverse Breakpoints** (`b`): Breakpoints halt execution seamlessly in both forward and reverse directions.
+  - **Post-Halt Recovery**: If a program terminates or halts (`HLT`), pressing `u` steps back before the halt, reviving CPU execution so students can inspect the final machine state without restarting.
+  - **Live Step Counter**: Telemetry status shows `[Rev: X]` reflecting the exact depth of the time-travel history buffer.
 - **LazyVim-Style In-TUI Modal Code Editor**: Write, navigate, and edit assembly code directly inside the TUI with `NORMAL` vs `INSERT` modes:
   - `i`: Insert at cursor, `a`: Append after cursor, `O`: Open new line.
   - `x`: Delete character under cursor, `d`: Delete active line.
@@ -30,7 +36,7 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
   - `z`: Maximize / zoom active window to full screen.
   - `t`: Show / hide Virtual Hardware Telemetry pane.
   - `v` / `o`: Toggle inspector between Hex Dump, Stack View, and Program Console Output.
-- **53 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, and the in-TUI modal code editor.
+- **63 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, the in-TUI modal code editor, and time-travel reverse execution.
 
 ---
 
@@ -95,9 +101,11 @@ python3 main.py ./tests/Requirement/bubble_sort.asm -t
 | `<Space>w` | Save source file changes directly back to disk |
 | **Execution & Debugging** | |
 | `s` / `Enter` | Single-step forward by one instruction |
-| `c` | Continue running continuously |
-| `p` | Pause continuous execution |
-| `b` | Toggle breakpoint on the selected instruction or source line |
+| `u` / `Backspace` | Single-step backward by one instruction (Rewind / Undo step) |
+| `c` | Continue running forward continuously |
+| `C` / `U` | Continue running backward continuously (Rewind to break/start) |
+| `p` | Pause continuous forward or backward execution |
+| `b` | Toggle breakpoint (halts in both forward and reverse execution) |
 | `r` | Reset CPU and reload assembly program to initial state |
 | `+` / `-` | Increase / decrease continuous execution speed |
 | **LazyVim Window Controls** | |
