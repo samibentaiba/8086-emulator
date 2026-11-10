@@ -69,6 +69,7 @@ class Assembler(object):
         self.seg_len = {} # Segment actual length
         self.tags = {} # Labels
         self.vars = {} # Variables
+        self.constants = {}  # EQU symbol table: name -> value string
         self.ip = '0'    # Program entry offset
         self.ins_origin = [] # Raw unparsed instructions
 
@@ -147,6 +148,10 @@ class Assembler(object):
                                 self.space[key][i][j] = v
                             elif ins[j][:len(k)] == k and ins[j][len(k)] == '[':
                                 self.space[key][i][j] = v + ins[j][len(k):]
+                        # Replace EQU constants
+                        for k, v in self.constants.items():
+                            if ins[j] == k:
+                                self.space[key][i][j] = v
                         j += 1
                         # Variable: MOV BX,A[SI]  A = a.seg*16 + a.offset
                         # Variable: add ax, Item  Item = [a.seg*16 + a.offset]
@@ -194,6 +199,26 @@ class Assembler(object):
                     self.space[seg_name][seg_ip] = ins
                     seg_ip += 1
             
+            elif len(ins) >= 3 and ins[1] == 'EQU':  # EQU constant definition
+                # EQU NAME VALUE — register a symbolic constant
+                equ_name = ins[0]
+                equ_val_str = ins_ori.split(None, 2)[2].strip() if len(ins_ori.split(None, 2)) > 2 else ins[2]
+                self.constants[equ_name] = equ_val_str
+                # Don't consume segment IP — EQU generates no code
+
+            elif len(ins) >= 2 and ins[1] == 'PROC':
+                # PROC definition — treat as a label entry point; NEAR/FAR are only advisory
+                proc_name = ins[0]
+                self.tags[proc_name] = {
+                    'seg': self.seg_adr[seg_name],
+                    'offset': hex(seg_ip),
+                    'type': 0
+                }
+
+            elif len(ins) >= 2 and ins[1] == 'ENDP':
+                # ENDP — marks end of procedure definition, no code generated
+                pass
+
             elif ins[0] in data_def_ins: # Data definition pseudo-instruction
                 byte_list = self.__data_define(ins, ins_ori)
                 self.space[seg_name][seg_ip:seg_ip+len(byte_list)] = byte_list
