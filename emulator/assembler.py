@@ -75,13 +75,23 @@ class Assembler(object):
 
     def compile(self, code):
         instructions = self.__preprocessing(code)
+        # Pre-scan ASSUME directives so segments defined before ASSUME are recognized
+        for ins in instructions:
+            if ins and ins[0] == 'ASSUME':
+                self.__assume(ins[1:])
+        # Provide fallback mappings for standard segment names
+        default_mappings = {'CODE': 'CS', 'DATA': 'DS', 'STACK': 'SS', 'EXTRA': 'ES'}
+        for name, reg in default_mappings.items():
+            if name not in self.seg_id:
+                self.seg_id[name] = reg
+
         for ip in range(len(instructions)):
             ins = instructions[ip]
             if ins[0] == 'NAME': # Module name
                 self.name = ins[1] 
             elif ins[0] == 'TITLE': # File name
                 self.title = ins[1]
-            elif ins[0] == 'ASSUME': # ASSUME must precede segments
+            elif ins[0] == 'ASSUME': # Already handled in pre-scan
                 self.__assume(ins[1:])
             elif len(ins) > 1 and ins[1] == 'SEGMENT':
                 ip = self.__segment(instructions, ip)
@@ -199,6 +209,10 @@ class Assembler(object):
                     self.space[seg_name][seg_ip] = ins
                     seg_ip += 1
             
+            elif ins[0] == 'ASSUME':
+                self.__assume(ins[1:])
+                # Directive only, generate no instruction in space
+
             elif len(ins) >= 3 and ins[1] == 'EQU':  # EQU constant definition
                 # EQU NAME VALUE — register a symbolic constant
                 equ_name = ins[0]
