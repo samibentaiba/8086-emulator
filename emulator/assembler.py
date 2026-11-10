@@ -5,6 +5,22 @@ import ast
 from pprint import pprint
 from emulator.instructions import all_ins,transfer_control_ins
 
+class AssemblyError(Exception):
+    """Raised when the assembler encounters a syntax or semantic error.
+    
+    Attributes:
+        message  -- human-readable description
+        line     -- 1-based source line number (None if unknown)
+        source   -- the original source text of the offending line
+    """
+    def __init__(self, message, line=None, source=None):
+        self.line = line
+        self.source = source
+        loc = f" at line {line}" if line is not None else ""
+        src = f"\n  Source: {source}" if source else ""
+        super().__init__(f"AssemblyError{loc}: {message}{src}")
+
+
 data_def_ins = ['DB', 'DW', 'DD', 'DQ', 'DT', 'DUP']
 
 def to_int_str(matched):
@@ -157,7 +173,8 @@ class Assembler(object):
                 assert num & (num-1) == 0, "Num should be power of 2"  # num is power of 2
                 seg_ip += (-seg_ip) % num 
             elif ins[0] == seg_tmp:
-                assert ins[1] == 'ENDS', "Compile Error: segment ends fault"
+                if ins[1] != 'ENDS':
+                    raise AssemblyError(f"Expected 'ENDS' to close segment '{seg_tmp}', got '{ins[1]}'", line=i+1)
                 self.seg_len[seg_name] = seg_ip
                 return i + 1
 
@@ -219,7 +236,7 @@ class Assembler(object):
             byte_list = self.__str_to_dwords(dd_str)
             
         else:
-            sys.exit("Compile Error")
+            raise AssemblyError(f"Unknown data definition directive '{var}'", source=ins_ori)
         
         # print("bytes_list: ", byte_list)
         return byte_list
@@ -236,7 +253,7 @@ class Assembler(object):
                 for s in item:
                     byte_list.append([hex(ord(s))])
             else:
-                sys.exit("Compile Error: str to hex")
+                raise AssemblyError(f"DB directive: cannot convert item '{item}' to byte")
         return byte_list
 
     @classmethod
@@ -245,7 +262,8 @@ class Assembler(object):
         str_list =  ast.literal_eval(string)
         byte_list = []
         for item in str_list:
-            assert isinstance(item, int), "Compile Error: str to hex"
+            if not isinstance(item, int):
+                raise AssemblyError(f"DW directive: expected integer value, got '{item}'")
             high, low = item >> 8, item & 0x0ff
             byte_list.append([hex(low)])  # little endian
             byte_list.append([hex(high)]) 
@@ -257,7 +275,8 @@ class Assembler(object):
         str_list =  ast.literal_eval(string)
         byte_list = []
         for item in str_list:
-            assert isinstance(item, int), "Compile Error: str to hex"
+            if not isinstance(item, int):
+                raise AssemblyError(f"DD directive: expected integer value, got '{item}'")
             byte_list.append([hex(item & 0x0ff)]) # little endian
             byte_list.append([hex(item >> 8 & 0x0ff)])
             byte_list.append([hex(item >> 16 & 0x0ff)])

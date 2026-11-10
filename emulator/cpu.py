@@ -1,7 +1,7 @@
 import time
 import re
 from pprint import pprint
-from emulator.assembler import Assembler, to_decimal
+from emulator.assembler import Assembler, AssemblyError, to_decimal
 
 class CPU(object):
     
