@@ -1,7 +1,7 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-50%2F50%20passing-brightgreen)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-53%2F53%20passing-brightgreen)
 
 An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive LazyVim/Neovim-style Terminal User Interface (TUI) with a built-in modal code editor, a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
@@ -15,6 +15,12 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
   - `x`: Delete character under cursor, `d`: Delete active line.
   - `<Esc>`: Exit insert mode and trigger instant on-the-fly reassembly and live memory reload.
   - `<Space>w`: Save source file changes directly back to disk.
+- **Character-Level Neovim Block Cursor**:
+  - High-contrast inverted block cursor cell (`A_REVERSE`) rendering the exact character/letter currently targeted in both `NORMAL` and `INSERT` modes.
+  - Live cursor telemetry in the header: `CODE [MODE] (Ln X, Col Y)`.
+  - Horizontal viewport auto-scrolling (`source_scroll_x`) tracking cursor movements across long source lines.
+  - Line-boundary motions: `0` / `^` (jump to line start), `$` (jump to line end), plus `Home` / `End`.
+  - Focus-aware cursor visibility: block cursor automatically dims when navigating away to other panes.
 - **Exact 1-to-1 Debug Symbol Tracking**: Deterministic mapping (`ip_to_source_line`) ensures that exactly **one** line is highlighted with the execution pointer `▶` at any clock cycle, eliminating multi-line highlighting glitches.
 - **Zero-Glitch Terminal Canvas**: Complete elimination of terminal tearing and ghost artifacts via mathematical bounding-box clipping (`max_w = w - 2`), `stdscr.clear()` double-buffered transitions on layout shifts, and silent stdout isolation.
 - **LazyVim Window Management & Which-Key Menu**:
@@ -24,7 +30,7 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
   - `z`: Maximize / zoom active window to full screen.
   - `t`: Show / hide Virtual Hardware Telemetry pane.
   - `v` / `o`: Toggle inspector between Hex Dump, Stack View, and Program Console Output.
-- **50 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, and the in-TUI modal code editor.
+- **53 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, and the in-TUI modal code editor.
 
 ---
 
@@ -104,7 +110,9 @@ python3 main.py ./tests/Requirement/bubble_sort.asm -t
 | `o` | Direct jump to **Program Console Output** inspector |
 | `m` | Cycle memory segment (`DS` $\rightarrow$ `CS` $\rightarrow$ `SS` $\rightarrow$ `ES` $\rightarrow$ `VIDEO`) |
 | **Navigation** | |
-| `h` / `l` | Move cursor left / right within source line |
+| `h` / `l` / `Left` / `Right` | Move cursor left / right within source line |
+| `0` / `^` | Jump to beginning of line (NORMAL mode) / `Home` (INSERT mode) |
+| `$` | Jump to end of line (NORMAL mode) / `End` (INSERT mode) |
 | `j` / `k` / `Down` / `Up` | Move cursor down / up (Code Editor) or scroll memory ($\pm 16$ bytes) |
 | `g` / `G` | Jump to beginning / end of source code or memory |
 | `Page Down` / `Page Up` | Page scroll editor / memory (128 bytes) |

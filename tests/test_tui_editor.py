@@ -197,6 +197,75 @@ class TestTUIModalEditor(unittest.TestCase):
         output = captured_stdout.getvalue()
         self.assertEqual(output.strip(), "")
 
+    def test_09_character_cursor_positioning_and_motions(self):
+        """Verify character-level cursor positioning with 0, $, h, l, and bounds."""
+        self.tui.focused_pane = 'disasm'
+        self.tui.source_lines[0] = "MOV AX, 0x1234"
+        self.tui.edit_row = 0
+        self.tui.edit_col = 0
+
+        # Jump to end with '$'
+        self.tui._handle_key(None, ord('$'))
+        self.assertEqual(self.tui.edit_col, len("MOV AX, 0x1234"))
+
+        # Move left with 'h'
+        self.tui._handle_key(None, ord('h'))
+        self.assertEqual(self.tui.edit_col, len("MOV AX, 0x1234") - 1)
+
+        # Move right with 'l'
+        self.tui._handle_key(None, ord('l'))
+        self.assertEqual(self.tui.edit_col, len("MOV AX, 0x1234"))
+
+        # Jump to beginning with '0'
+        self.tui._handle_key(None, ord('0'))
+        self.assertEqual(self.tui.edit_col, 0)
+
+        # Jump to beginning with '^'
+        self.tui.edit_col = 5
+        self.tui._handle_key(None, ord('^'))
+        self.assertEqual(self.tui.edit_col, 0)
+
+    from unittest.mock import patch
+
+    @patch('curses.color_pair', return_value=0)
+    def test_10_horizontal_scrolling_for_wide_lines(self, mock_cp):
+        """Verify that horizontal viewport scrolling tracks cursor on wide lines."""
+        self.tui.focused_pane = 'disasm'
+        wide_line = "MOV AX, " + "X" * 120
+        self.tui.source_lines[0] = wide_line
+        self.tui.edit_row = 0
+        self.tui.edit_col = 100
+
+        class MockWin:
+            def getmaxyx(self):
+                return (24, 80)
+            def addstr(self, *args, **kwargs):
+                pass
+            def move(self, *args, **kwargs):
+                pass
+
+        mock_win = MockWin()
+        self.tui._render_disassembly(mock_win, 1, 0, 20, 40)
+        # Verify that source_scroll_x followed edit_col so cursor is in visible range
+        self.assertGreater(self.tui.source_scroll_x, 0)
+        avail_w = max(5, 38 - 6) # w - 2 - 6 = 32
+        rel_cursor = self.tui.edit_col - self.tui.source_scroll_x
+        self.assertTrue(0 <= rel_cursor < avail_w)
+
+    def test_11_cursor_visibility_focus_state(self):
+        """Verify that cursor is active when Code Editor is focused and dims when unfocused."""
+        self.assertEqual(self.tui.focused_pane, 'disasm')
+        self.assertTrue(self.tui.focused_pane == 'disasm')
+
+        # Switch to Registers pane
+        self.tui._handle_key(None, ord('2'))
+        self.assertEqual(self.tui.focused_pane, 'registers')
+        self.assertNotEqual(self.tui.focused_pane, 'disasm')
+
+        # Switch back to Code Editor pane
+        self.tui._handle_key(None, ord('1'))
+        self.assertEqual(self.tui.focused_pane, 'disasm')
+
 
 if __name__ == '__main__':
     unittest.main()

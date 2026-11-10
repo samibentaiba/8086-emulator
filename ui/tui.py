@@ -54,7 +54,8 @@ class EmulatorTUI:
         self.mode = 'NORMAL'          # 'NORMAL' or 'INSERT'
         self.edit_row = 0             # 0-indexed line in source_lines
         self.edit_col = 0             # 0-indexed column within line
-        self.source_scroll_y = 0      # viewport scroll offset
+        self.source_scroll_y = 0      # viewport vertical scroll offset
+        self.source_scroll_x = 0      # viewport horizontal scroll offset
         self.modified = False         # unsaved changes flag
 
         # LazyVim Window Manager state
@@ -87,6 +88,8 @@ class EmulatorTUI:
         self.source_lines = self.asm_code.splitlines() if self.asm_code else [""]
         self.edit_row = 0
         self.edit_col = 0
+        self.source_scroll_y = 0
+        self.source_scroll_x = 0
         self._build_source_mapping()
 
     def _build_source_mapping(self):
@@ -433,7 +436,9 @@ class EmulatorTUI:
         is_focused = (self.focused_pane == 'disasm')
         mode_tag = f" [{self.mode}]"
         mod_mark = " [+]" if self.modified else ""
-        title = f"CODE{mode_tag}{mod_mark} (Ln {self.edit_row + 1}/{len(self.source_lines)})"
+        cur_line_len = len(self.source_lines[self.edit_row]) if self.source_lines else 0
+        self.edit_col = max(0, min(cur_line_len, self.edit_col))
+        title = f"CODE{mode_tag}{mod_mark} (Ln {self.edit_row + 1}, Col {self.edit_col + 1})"
         self._draw_box(win, y, x, h, w, title, is_focused)
 
         content_h = max(1, h - 2)
@@ -446,7 +451,7 @@ class EmulatorTUI:
         current_ip = self.BIU.reg.get('IP', 0)
         exec_line_idx = self.ip_to_source_line.get(current_ip, -1)
 
-        # Viewport scrolling: follow executing line when follow_ip is True, else edit_row
+        # Viewport vertical scrolling: follow executing line when follow_ip is True, else edit_row
         target_row = exec_line_idx if (self.follow_ip and exec_line_idx >= 0) else self.edit_row
         if target_row < self.source_scroll_y:
             self.source_scroll_y = target_row
@@ -454,6 +459,15 @@ class EmulatorTUI:
             self.source_scroll_y = target_row - content_h + 1
 
         inner_w = max(0, w - 2)
+        prefix_len = 6  # "01│  " is 6 characters
+        avail_w = max(5, inner_w - prefix_len)
+
+        # Horizontal viewport auto-scrolling to follow cursor when focused
+        if is_focused:
+            if self.edit_col < self.source_scroll_x:
+                self.source_scroll_x = self.edit_col
+            elif self.edit_col >= self.source_scroll_x + avail_w:
+                self.source_scroll_x = self.edit_col - avail_w + 1
 
         for row_idx in range(content_h):
             line_idx = self.source_scroll_y + row_idx
@@ -471,37 +485,82 @@ class EmulatorTUI:
 
             num_str = f"{line_idx + 1:02d}"
             prefix = f"{num_str}│{bp_mark}{ptr_mark} "
-            avail_w = max(0, inner_w - len(prefix))
-            disp_line = line_text[:avail_w]
-            full_line_text = f"{prefix}{disp_line}"
+            row_y = y + 1 + row_idx
 
-            attr = curses.A_NORMAL
-            if is_cursor_line and self.mode == 'INSERT':
-                attr = curses.color_pair(2) | curses.A_BOLD
-            elif is_cursor_line:
-                attr = curses.color_pair(9) | curses.A_BOLD
-            elif is_exec_line:
-                attr = curses.color_pair(5) | curses.A_BOLD
+            # Draw line number prefix
+            prefix_attr = (curses.color_pair(3) | curses.A_BOLD) if is_cursor_line else curses.color_pair(8)
+            self._safe_addstr(win, row_y, x + 1, prefix, prefix_attr, max_w=len(prefix))
+
+            # Syntax highlighting base attribute
+            base_attr = curses.A_NORMAL
+            if is_exec_line:
+                base_attr = curses.color_pair(5) | curses.A_BOLD
             elif is_bp:
-                attr = curses.color_pair(4) | curses.A_BOLD
+                base_attr = curses.color_pair(4) | curses.A_BOLD
             else:
                 stripped = line_text.strip()
                 if stripped.startswith(';'):
-                    attr = curses.color_pair(8)
+                    base_attr = curses.color_pair(8)
                 elif 'SEGMENT' in stripped or 'ENDS' in stripped or stripped.endswith(':'):
-                    attr = curses.color_pair(7) | curses.A_BOLD
+                    base_attr = curses.color_pair(7) | curses.A_BOLD
                 else:
-                    attr = curses.color_pair(2) if line_idx % 2 == 0 else curses.A_NORMAL
+                    base_attr = curses.color_pair(2) if line_idx % 2 == 0 else curses.A_NORMAL
 
-            padded_text = full_line_text.ljust(inner_w)[:inner_w]
-            self._safe_addstr(win, y + 1 + row_idx, x + 1, padded_text, attr, max_w=inner_w)
+            # Slice line based on horizontal scroll offset
+            disp_line = line_text[self.source_scroll_x : self.source_scroll_x + avail_w]
+            cur_draw_x = x + 1 + len(prefix)
 
-        # In INSERT mode, position blinking terminal cursor
-        if self.mode == 'INSERT' and is_focused:
+            if is_cursor_line:
+                # Active line with Character-Level Inverted Block Cursor
+                rel_cursor = self.edit_col - self.source_scroll_x
+
+                # 1. Text before cursor
+                before = disp_line[:max(0, rel_cursor)]
+                if before:
+                    self._safe_addstr(win, row_y, cur_draw_x, before, base_attr, max_w=len(before))
+                    cur_draw_x += len(before)
+
+                # 2. Exact Character Under Cursor
+                if 0 <= rel_cursor < avail_w:
+                    cursor_char = disp_line[rel_cursor] if rel_cursor < len(disp_line) else " "
+                    if self.mode == 'INSERT':
+                        # High-visibility bright green inverted block in INSERT mode
+                        cursor_attr = curses.color_pair(2) | curses.A_REVERSE | curses.A_BOLD
+                    else:
+                        # Solid blue/white inverted block in NORMAL mode
+                        cursor_attr = curses.color_pair(9) | curses.A_REVERSE | curses.A_BOLD
+
+                    self._safe_addstr(win, row_y, cur_draw_x, cursor_char, cursor_attr, max_w=1)
+                    cur_draw_x += 1
+
+                # 3. Text after cursor
+                after = disp_line[rel_cursor + 1:] if (rel_cursor + 1 < len(disp_line)) else ""
+                if after:
+                    self._safe_addstr(win, row_y, cur_draw_x, after, base_attr, max_w=len(after))
+                    cur_draw_x += len(after)
+
+                # 4. Fill remainder with blanks
+                rem = (x + 1 + inner_w) - cur_draw_x
+                if rem > 0:
+                    self._safe_addstr(win, row_y, cur_draw_x, " " * rem, curses.A_NORMAL, max_w=rem)
+            else:
+                # Inactive line: draw sliced text and pad
+                self._safe_addstr(win, row_y, cur_draw_x, disp_line, base_attr, max_w=avail_w)
+                cur_draw_x += len(disp_line)
+                rem = (x + 1 + inner_w) - cur_draw_x
+                if rem > 0:
+                    self._safe_addstr(win, row_y, cur_draw_x, " " * rem, curses.A_NORMAL, max_w=rem)
+
+        # Position terminal cursor precisely on the active character cell
+        if is_focused and (0 <= (self.edit_row - self.source_scroll_y) < content_h):
             curs_y = y + 1 + (self.edit_row - self.source_scroll_y)
-            curs_x = x + 1 + 6 + min(self.edit_col, max(0, w - 9))
+            rel_col = self.edit_col - self.source_scroll_x
+            curs_x = x + 1 + len(prefix) + max(0, min(rel_col, avail_w - 1))
             try:
-                curses.curs_set(1)
+                if self.mode == 'INSERT':
+                    curses.curs_set(1)
+                else:
+                    curses.curs_set(0)
                 win.move(curs_y, curs_x)
             except curses.error:
                 pass
@@ -895,12 +954,20 @@ class EmulatorTUI:
                 self.modified = True
                 return True
 
-            elif key == curses.KEY_LEFT:
+            elif key in [curses.KEY_LEFT]:
                 self.edit_col = max(0, self.edit_col - 1)
                 return True
 
-            elif key == curses.KEY_RIGHT:
+            elif key in [curses.KEY_RIGHT]:
                 self.edit_col = min(len(cur_line), self.edit_col + 1)
+                return True
+
+            elif key in [curses.KEY_HOME]:
+                self.edit_col = 0
+                return True
+
+            elif key in [curses.KEY_END]:
+                self.edit_col = len(cur_line)
                 return True
 
             elif key == curses.KEY_UP:
@@ -996,7 +1063,7 @@ class EmulatorTUI:
                 self._recompile_code()
             return True
 
-        # Vim cursor motions within line: h (left), l (right)
+        # Vim cursor motions within line: h (left), l (right), 0/^ (start), $ (end)
         elif key in [ord('h'), curses.KEY_LEFT]:
             if self.focused_pane == 'disasm':
                 self.edit_col = max(0, self.edit_col - 1)
@@ -1006,6 +1073,17 @@ class EmulatorTUI:
             if self.focused_pane == 'disasm':
                 cur_line = self.source_lines[self.edit_row] if self.source_lines else ""
                 self.edit_col = min(len(cur_line), self.edit_col + 1)
+            return True
+
+        elif key in [ord('0'), ord('^')]:
+            if self.focused_pane == 'disasm':
+                self.edit_col = 0
+            return True
+
+        elif key in [ord('$')]:
+            if self.focused_pane == 'disasm':
+                cur_line = self.source_lines[self.edit_row] if self.source_lines else ""
+                self.edit_col = len(cur_line)
             return True
 
         # Window navigation: 1, 2, 3, 4
