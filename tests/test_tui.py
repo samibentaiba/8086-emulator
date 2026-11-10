@@ -105,6 +105,13 @@ class TestEmulatorTUI(unittest.TestCase):
         self.assertEqual(snap2['AX'], 0x2000)
         self.assertNotEqual(snap1['AX'], snap2['AX'])
 
+    def test_stack_view_toggle(self):
+        self.assertEqual(self.tui.mem_view_mode, 'hex')
+        self.tui._handle_key(None, ord('v'))
+        self.assertEqual(self.tui.mem_view_mode, 'stack')
+        self.tui._handle_key(None, ord('v'))
+        self.assertEqual(self.tui.mem_view_mode, 'hex')
+
 
 if __name__ == "__main__":
     unittest.main()
