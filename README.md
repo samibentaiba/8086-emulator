@@ -1,7 +1,7 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-63%2F63%20passing-brightgreen)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-75%2F75%20passing-brightgreen)
 
 An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive LazyVim/Neovim-style Terminal User Interface (TUI) with a built-in modal code editor, a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
@@ -19,7 +19,7 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 - **LazyVim-Style In-TUI Modal Code Editor**: Write, navigate, and edit assembly code directly inside the TUI with `NORMAL` vs `INSERT` modes:
   - `i`: Insert at cursor, `a`: Append after cursor, `O`: Open new line.
   - `x`: Delete character under cursor, `d`: Delete active line.
-  - `<Esc>`: Exit insert mode and trigger instant on-the-fly reassembly and live memory reload.
+  - `<Esc>`: Exit insert mode and trigger instant on-the-fly reassembly, pipeline prefetch flush, and live memory reload.
   - `<Space>w`: Save source file changes directly back to disk.
 - **Character-Level Neovim Block Cursor**:
   - High-contrast inverted block cursor cell (`A_REVERSE`) rendering the exact character/letter currently targeted in both `NORMAL` and `INSERT` modes.
@@ -36,7 +36,7 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
   - `z`: Maximize / zoom active window to full screen.
   - `t`: Show / hide Virtual Hardware Telemetry pane.
   - `v` / `o`: Toggle inspector between Hex Dump, Stack View, and Program Console Output.
-- **63 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, the in-TUI modal code editor, and time-travel reverse execution.
+- **75 Automated Unit Tests**: Comprehensive test suite covering instructions, interrupts, peripherals, assembler directives, student learning workflows, the in-TUI modal code editor, time-travel reverse execution, and advanced TUI stress testing scenarios.
 
 ---
 

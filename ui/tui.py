@@ -178,6 +178,8 @@ class EmulatorTUI:
             self.assembler = new_asm
             self.exe_file = new_exe
             self.memory.load(self.exe_file)
+            if hasattr(self, 'BIU') and self.BIU:
+                self.BIU.flush_pipeline()
             self._cache_instructions()
             self._build_source_mapping()
             self.need_full_clear = True
