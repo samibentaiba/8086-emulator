@@ -34,8 +34,11 @@ class PeripheralManager(object):
         """Register default EMU8086 hardware peripherals."""
         try:
             from .traffic_lights import TrafficLightsDevice
+            from .stepper_motor import StepperMotorDevice
             # Port 4: Standard EMU8086 Traffic Lights
             self.register(4, TrafficLightsDevice(enable_gui=self.enable_gui))
+            # Port 7: Standard EMU8086 Stepper Motor
+            self.register(7, StepperMotorDevice(enable_gui=self.enable_gui))
         except Exception as e:
             print(f"[PeripheralManager] Warning initializing default devices: {e}", file=sys.stderr)
 

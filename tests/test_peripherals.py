@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from emulator.peripherals.manager import PeripheralManager
 from emulator.peripherals.traffic_lights import TrafficLightsDevice
+from emulator.peripherals.stepper_motor import StepperMotorDevice
 
 
 class TestTrafficLightsPeripheral(unittest.TestCase):
@@ -63,6 +64,46 @@ class TestTrafficLightsPeripheral(unittest.TestCase):
         self.assertEqual(self.mgr.read_port(4, byte_size=2), 0x0212)
         # Read byte returns low 8 bits
         self.assertEqual(self.mgr.read_port(4, byte_size=1), 0x12)
+
+
+class TestStepperMotorPeripheral(unittest.TestCase):
+    def setUp(self):
+        self.dev = StepperMotorDevice(enable_gui=False)
+        self.mgr = PeripheralManager(enable_gui=False)
+        self.mgr.register(7, self.dev)
+
+    def tearDown(self):
+        self.mgr.close_all()
+
+    def test_ready_bit(self):
+        # IN AL, 7 should return ready flag (bit 7 set)
+        val = self.mgr.read_port(7, byte_size=1)
+        self.assertTrue(bool(val & 0x80))
+
+    def test_clockwise_half_step_sequence(self):
+        # Clockwise sequence: 0110b -> 0100b -> 0011b -> 0010b
+        cw_steps = [0b0110, 0b0100, 0b0011, 0b0010]
+        for step in cw_steps:
+            self.mgr.write_port(7, step, byte_size=1)
+        self.assertEqual(self.dev.direction_str, "CW")
+        self.assertEqual(self.dev.step_count, 3) # 3 transitions
+        self.assertAlmostEqual(self.dev.angle, 3 * 11.25)
+
+    def test_counter_clockwise_sequence(self):
+        # CCW sequence: 0011b -> 0001b -> 0110b -> 0010b
+        ccw_steps = [0b0011, 0b0001, 0b0110, 0b0010]
+        for step in ccw_steps:
+            self.mgr.write_port(7, step, byte_size=1)
+        self.assertEqual(self.dev.direction_str, "CCW")
+        self.assertEqual(self.dev.step_count, 3) # 3 transitions
+        self.assertAlmostEqual(self.dev.angle, (360.0 - 3 * 11.25) % 360.0)
+
+    def test_full_revolution_wrap(self):
+        # 32 steps * 11.25 deg = 360 deg
+        cw_steps = [0b0110, 0b0100, 0b0011, 0b0010]
+        for i in range(33):
+            self.mgr.write_port(7, cw_steps[i % len(cw_steps)], byte_size=1)
+        self.assertAlmostEqual(self.dev.angle, 0.0)
 
 
 if __name__ == '__main__':

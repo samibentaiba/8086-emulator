@@ -5,5 +5,6 @@ EMU8086 Compatible Devices
 
 from .manager import PeripheralManager
 from .traffic_lights import TrafficLightsDevice
+from .stepper_motor import StepperMotorDevice
 
-__all__ = ['PeripheralManager', 'TrafficLightsDevice']
+__all__ = ['PeripheralManager', 'TrafficLightsDevice', 'StepperMotorDevice']
