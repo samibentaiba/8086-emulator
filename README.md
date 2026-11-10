@@ -1,7 +1,7 @@
 ![](image/logo.png)
 
 # 8086-emulator
-![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-22%2F22%20passing-brightgreen)
+![](https://img.shields.io/github/license/samibentaiba/8086-emulator)   ![](https://img.shields.io/github/repo-size/samibentaiba/8086-emulator)   ![Unit Tests](https://img.shields.io/badge/tests-42%2F42%20passing-brightgreen)
 
 An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware testing sandbox featuring an interactive Neovim/GDB-style Terminal User Interface (TUI), a PyQt5 desktop GUI, and EMU8086-compatible hardware peripherals.
 
