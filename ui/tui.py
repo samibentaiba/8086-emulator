@@ -3,11 +3,15 @@ Antigravity 8086 Full-Featured Terminal User Interface (TUI)
 Neovim / GDB TUI style interactive debugger and virtual hardware monitor.
 """
 
-import curses
 import os
 import re
 import sys
 import time
+
+try:
+    import curses
+except ImportError:
+    curses = None
 
 from emulator.assembler import Assembler, to_decimal
 from emulator.cpu import CPU
@@ -38,6 +42,7 @@ class EmulatorTUI:
         self.disasm_cursor_idx = 0
         self.follow_ip = True
         self.running = False
+        self.show_help = False
         self.step_delay = 0.05  # seconds between steps in run mode
         self.last_step_time = 0
         self.status_msg = "Initialized. Press [s] to step, [c] to run, [Tab] to switch pane, [?] for help."
@@ -76,17 +81,15 @@ class EmulatorTUI:
         self.EU = execution_unit.execution_unit(self.BIU, int_msg=False)
         self.cpu = CPU(self.BIU, self.EU, gui_mode=False)
 
-        # Cache instructions list
+        # Cache instructions list with clean formatting
         cs_space = self.exe_file.space.get('CS', [])
         cs_len = self.exe_file.seg_len.get('CS', len(cs_space))
         self.instructions = []
         for idx in range(cs_len):
             item = cs_space[idx]
             if item != ['0']:
-                ins_str = " ".join(item)
-                parts = ins_str.split(" ", 1)
-                opcode = parts[0]
-                opds = parts[1] if len(parts) > 1 else ""
+                opcode = item[0]
+                opds = ", ".join(item[1:]) if len(item) > 1 else ""
                 self.instructions.append((idx, opcode, opds))
 
         self.prev_regs = self._snapshot_regs()
@@ -130,6 +133,14 @@ class EmulatorTUI:
             return False
 
     def run(self):
+        if curses is None:
+            print("\nError: The 'curses' library is required to run the Terminal User Interface.")
+            if sys.platform == 'win32':
+                print("On Windows, please install windows-curses via:")
+                print("    pip install windows-curses\n")
+            else:
+                print("Please install curses or use a Python distribution with curses support.\n")
+            sys.exit(1)
         try:
             curses.wrapper(self._main_loop)
         finally:
@@ -210,8 +221,8 @@ class EmulatorTUI:
             main_h = max_y - 4
 
             disasm_h = main_h
-            reg_h = 10
-            telem_h = 9
+            reg_h = min(10, max(8, main_h // 3))
+            telem_h = min(9, max(7, main_h // 3))
             mem_h = main_h - reg_h - telem_h
 
             # Render Panes
@@ -222,6 +233,10 @@ class EmulatorTUI:
 
             # Footer
             self._render_footer(stdscr, max_y, max_x)
+
+            # Floating Help Modal (if active)
+            if self.show_help:
+                self._render_help_modal(stdscr, max_y, max_x)
 
             stdscr.refresh()
 
@@ -299,7 +314,6 @@ class EmulatorTUI:
         cx = eu_reg.get('CX', 0)
         dx = eu_reg.get('DX', 0)
 
-        # Highlight if changed
         def get_reg_attr(name, val):
             if name in self.prev_regs and self.prev_regs[name] != val:
                 return curses.color_pair(3) | curses.A_BOLD  # Yellow changed
@@ -453,15 +467,64 @@ class EmulatorTUI:
             self._safe_addstr(win, y + 1 + row, x + 1, row_text, curses.color_pair(2) if row % 2 == 0 else curses.A_NORMAL)
 
     def _render_footer(self, win, max_y, max_x):
-        hotkeys = "[s] Step  [c] Run  [p] Pause  [b] Break  [Tab] Pane  [k/j] Navigate  [m] MemSeg  [+/-] Speed  [q] Quit"
+        hotkeys = "[s] Step  [c] Run  [p] Pause  [b] Break  [Tab] Pane  [k/j] Navigate  [m] MemSeg  [?] Help  [q] Quit"
         self._safe_addstr(win, max_y - 2, 0, f" {hotkeys}".ljust(max_x), curses.color_pair(6) | curses.A_BOLD)
 
         status_line = f" MSG: {self.status_msg}"
         self._safe_addstr(win, max_y - 1, 0, status_line.ljust(max_x), curses.color_pair(3))
 
+    def _render_help_modal(self, win, max_y, max_x):
+        modal_w = min(72, max_x - 4)
+        modal_h = min(20, max_y - 4)
+        start_y = max(1, (max_y - modal_h) // 2)
+        start_x = max(1, (max_x - modal_w) // 2)
+
+        # Clear background area of modal with spaces
+        for r in range(start_y, start_y + modal_h):
+            self._safe_addstr(win, r, start_x, " " * modal_w, curses.color_pair(6))
+
+        self._draw_box(win, start_y, start_x, modal_h, modal_w, "KEYBOARD SHORTCUTS & HELP", True)
+
+        help_lines = [
+            ("Execution Controls:", True),
+            ("  [s] / [Space]     Single-step one instruction forward", False),
+            ("  [c]               Continue running continuously", False),
+            ("  [p]               Pause continuous execution", False),
+            ("  [b]               Toggle breakpoint at current/selected IP", False),
+            ("  [r]               Reset CPU and reload program", False),
+            ("  [+] / [-]         Increase / decrease execution speed", False),
+            ("", False),
+            ("Navigation & Inspection:", True),
+            ("  [Tab]             Switch focus (Disassembly <-> Memory)", False),
+            ("  [k] / [↑]         Move cursor up / scroll memory up", False),
+            ("  [j] / [↓]         Move cursor down / scroll memory down", False),
+            ("  [PgUp] / [PgDn]   Scroll memory by 128 bytes", False),
+            ("  [m]               Cycle memory segment (DS, CS, SS, ES, VIDEO)", False),
+            ("", False),
+            ("  [?] / [h]         Toggle this help window", False),
+            ("  [q]               Quit TUI", False),
+            ("", False),
+            ("               Press any key to close this help window", True)
+        ]
+
+        for idx, (line, is_header) in enumerate(help_lines):
+            row = start_y + 1 + idx
+            if row >= start_y + modal_h - 1:
+                break
+            attr = (curses.color_pair(3) | curses.A_BOLD) if is_header else curses.color_pair(2)
+            self._safe_addstr(win, row, start_x + 2, line[:modal_w - 4], attr)
+
     def _handle_key(self, win, key):
+        if self.show_help:
+            self.show_help = False
+            return True
+
         if key in [ord('q'), ord('Q')]:
             return False
+
+        elif key in [ord('?'), ord('h'), ord('H')]:
+            self.show_help = True
+            return True
 
         elif key in [9]:  # Tab key
             self.focused_pane = 'memory' if self.focused_pane == 'disasm' else 'disasm'
@@ -536,8 +599,5 @@ class EmulatorTUI:
         elif key in [ord('-'), ord('_')]:
             self.step_delay = min(1.0, self.step_delay * 1.4)
             self.status_msg = f"Speed decreased (delay: {self.step_delay*1000:0.1f}ms)."
-
-        elif key in [ord('?'), ord('h'), ord('H')]:
-            self.status_msg = "Help: [s]=Step [c]=Run [p]=Pause [b]=Break [Tab]=Pane [m]=MemSeg [r]=Reset [q]=Quit"
 
         return True

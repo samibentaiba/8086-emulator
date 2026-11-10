@@ -84,6 +84,14 @@ class TestEmulatorTUI(unittest.TestCase):
         self.tui._handle_key(None, ord('m'))
         self.assertEqual(self.tui.mem_seg_idx, (init_seg_idx + 1) % len(self.tui.mem_segments))
 
+        # Test help modal toggle '?'
+        self.assertFalse(self.tui.show_help)
+        self.tui._handle_key(None, ord('?'))
+        self.assertTrue(self.tui.show_help)
+        # Any key closes help
+        self.tui._handle_key(None, ord('x'))
+        self.assertFalse(self.tui.show_help)
+
         # Test quit key 'q'
         ret = self.tui._handle_key(None, ord('q'))
         self.assertFalse(ret)

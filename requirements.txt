@@ -1,0 +1,7 @@
+# Antigravity 8086 Emulator Dependencies
+
+# Optional: Required for the Desktop Graphical User Interface (mainUI.py)
+PyQt5>=5.15.0
+
+# Optional: Required on Windows for the Terminal User Interface (tui.py / main.py -t)
+windows-curses>=2.3.0; sys_platform == 'win32'

@@ -1105,7 +1105,10 @@ class execution_unit(object):
             if hasattr(self, 'peripherals') and self.peripherals.has_device(port):
                 val = self.peripherals.read_port(port, self.opbyte)
             if val is None:
-                val = to_decimal(input(f"Input to Port {port}: "))
+                try:
+                    val = to_decimal(input(f"Input to Port {port}: "))
+                except (EOFError, OSError, ValueError):
+                    val = 0
             self.write_reg(self.opd[0], val)
         elif self.opcode == 'OUT':
             # Output from AL or AX to port. OUT 4, AX; OUT DX, AX
@@ -1132,7 +1135,11 @@ class execution_unit(object):
         elif ah == 0x01:
             if self.int_msg:
                 self.print("Interrupt Routine: Keyboard Input with Echo\n")
-            char = input()[0]
+            try:
+                char_in = input()
+                char = char_in[0] if char_in else '\r'
+            except (EOFError, OSError):
+                char = '\r'
             self.write_reg('AL', ord(char)) # Store ASCII
         
         elif ah == 0x02:
