@@ -167,6 +167,45 @@ class MainWindow(object):
         self.actionStop = self.gui.findChild(QAction, "actionStop")
         self.actionStop.triggered.connect(self.stopAction)
 
+        # Virtual Devices Menu (EMU8086 Hardware Peripherals)
+        menubar = self.gui.findChild(QMenuBar, "menubar")
+        if menubar:
+            devices_menu = menubar.addMenu("Virtual Devices")
+
+            action_traffic = devices_menu.addAction("Traffic Lights (Port 4)")
+            action_traffic.triggered.connect(self.openTrafficLights)
+
+            action_stepper = devices_menu.addAction("Stepper Motor (Port 7)")
+            action_stepper.triggered.connect(self.openStepperMotor)
+
+            action_video = devices_menu.addAction("Video Display (0xB8000)")
+            action_video.triggered.connect(self.openVideoDisplay)
+
+    def openTrafficLights(self):
+        if hasattr(self.EU, 'peripherals'):
+            dev = self.EU.peripherals.get_device(4)
+            if dev and not dev.process:
+                dev._start_gui()
+            elif not dev:
+                from emulator.peripherals.traffic_lights import TrafficLightsDevice
+                dev = TrafficLightsDevice(enable_gui=True)
+                self.EU.peripherals.register(4, dev)
+
+    def openStepperMotor(self):
+        if hasattr(self.EU, 'peripherals'):
+            dev = self.EU.peripherals.get_device(7)
+            if dev and not dev.process:
+                dev._start_gui()
+            elif not dev:
+                from emulator.peripherals.stepper_motor import StepperMotorDevice
+                dev = StepperMotorDevice(enable_gui=True)
+                self.EU.peripherals.register(7, dev)
+
+    def openVideoDisplay(self):
+        _ = self.EU.video
+        if self.EU.video_display and not self.EU.video_display.process:
+            self.EU.video_display._start_gui()
+
     def loadAssembly(self):
         # Enable/Disable actions
         self.actionLoad.setEnabled(False)
