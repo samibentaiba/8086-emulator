@@ -39,6 +39,7 @@ class execution_unit(object):
         self.eu_regs = list(self.reg.keys()) + ['AL', 'AH', 'BL', 'BH', 'CL', 'CH', 'DL', 'DH']
         self.biu_regs = list(BIU.reg.keys()) # 'DS', 'CS', 'SS', 'ES', 'IP'
         self.output = ''
+        self.mute_stdout = False
         from emulator.peripherals import PeripheralManager
         self.peripherals = PeripheralManager.get_instance()
         self.file_handles = {}
@@ -67,7 +68,8 @@ class execution_unit(object):
 
     def print(self, string):
         # emulator print
-        print(string, end='')
+        if not getattr(self, 'mute_stdout', False):
+            print(string, end='')
 
         self.output += string
 

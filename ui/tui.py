@@ -1,6 +1,6 @@
 """
 Antigravity 8086 Full-Featured Terminal User Interface (TUI)
-Neovim / GDB TUI style interactive debugger and virtual hardware monitor.
+LazyVim-style modular interactive debugger and virtual hardware monitor.
 """
 
 import os
@@ -43,18 +43,22 @@ class EmulatorTUI:
         self.follow_ip = True
         self.running = False
         self.show_help = False
+        self.show_leader_menu = False
         self.step_delay = 0.05  # seconds between steps in run mode
         self.last_step_time = 0
-        self.status_msg = "Initialized. Press [s] to step, [c] to run, [Tab] to switch pane, [?] for help."
+        self.status_msg = "Initialized. Press [Space] for Which-Key, [s] to step, [c] to run."
 
-        # Active pane: 'disasm' or 'memory'
-        self.focused_pane = 'disasm'
+        # LazyVim Window Manager state
+        self.focused_pane = 'disasm'  # 'disasm', 'registers', 'telemetry', 'memory'
+        self.show_telemetry = True     # toggle with 't'
+        self.zoomed_pane = None        # toggle with 'z' (None or pane name)
 
-        # Memory inspector state
+        # Memory inspector & Console state
         self.mem_segments = ['DS', 'CS', 'SS', 'ES', 'VIDEO']
         self.mem_seg_idx = 0
         self.mem_offset = 0
-        self.mem_view_mode = 'hex'  # 'hex' or 'stack'
+        self.mem_view_mode = 'hex'     # 'hex', 'stack', 'console'
+        self.console_scroll_offset = 0
 
         # Previous register state for change highlighting
         self.prev_regs = {}
@@ -84,8 +88,9 @@ class EmulatorTUI:
 
         self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.exe_file, self.memory)
         self.EU = execution_unit.execution_unit(self.BIU, int_msg=False)
+        self.EU.mute_stdout = True  # Mute raw stdout to prevent screen tearing/glitches
         self.cpu = CPU(self.BIU, self.EU, gui_mode=False)
-        self.cpu.tui_mode = True  # Suppress interactive debug() prompt in TUI mode
+        self.cpu.tui_mode = True   # Suppress interactive debug() prompt in TUI mode
 
         # Cache instructions list with clean formatting
         cs_space = self.exe_file.space.get('CS', [])
@@ -158,7 +163,7 @@ class EmulatorTUI:
         # Pair definitions
         curses.init_pair(1, curses.COLOR_CYAN, -1)     # Borders & Headers
         curses.init_pair(2, curses.COLOR_GREEN, -1)    # Success / Active / Values
-        curses.init_pair(3, curses.COLOR_YELLOW, -1)   # Warning / Changes / Addresses
+        curses.init_pair(3, curses.COLOR_YELLOW, -1)   # Warning / Changes / Focused
         curses.init_pair(4, curses.COLOR_RED, -1)      # Breakpoints / Errors / Halt
         curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_CYAN)    # Highlight Cursor Current IP
         curses.init_pair(6, curses.COLOR_BLACK, curses.COLOR_WHITE)   # Status Bar / Headers
@@ -178,6 +183,13 @@ class EmulatorTUI:
 
     def _draw_box(self, win, y, x, h, w, title="", is_focused=False):
         border_attr = (curses.color_pair(3) | curses.A_BOLD) if is_focused else curses.color_pair(1)
+
+        # Blank the interior of the box to guarantee no ghost artifacts or glitches
+        inner_w = max(0, w - 2)
+        blank = " " * inner_w
+        for row in range(y + 1, y + h - 1):
+            self._safe_addstr(win, row, x + 1, blank)
+
         for row in range(y, y + h):
             self._safe_addstr(win, row, x, "│", border_attr)
             self._safe_addstr(win, row, x + w - 1, "│", border_attr)
@@ -222,30 +234,59 @@ class EmulatorTUI:
             self._render_header(stdscr, max_x)
 
             # Pane Dimensions
-            left_w = min(50, int(max_x * 0.44))
-            right_w = max_x - left_w - 1
             main_h = max_y - 4
 
-            disasm_h = main_h
-            reg_h = min(10, max(8, main_h // 3))
-            telem_h = min(9, max(7, main_h // 3))
-            mem_h = main_h - reg_h - telem_h
-
-            # Render Panes
-            self._render_disassembly(stdscr, 1, 0, disasm_h, left_w)
-            self._render_registers(stdscr, 1, left_w, reg_h, right_w)
-            self._render_telemetry(stdscr, 1 + reg_h, left_w, telem_h, right_w)
-            if self.mem_view_mode == 'stack':
-                self._render_stack_view(stdscr, 1 + reg_h + telem_h, left_w, mem_h, right_w)
+            if self.zoomed_pane:
+                # Zoomed single-pane view (LazyVim <C-w>m / 'z' style)
+                if self.zoomed_pane == 'disasm':
+                    self._render_disassembly(stdscr, 1, 0, main_h, max_x)
+                elif self.zoomed_pane == 'registers':
+                    self._render_registers(stdscr, 1, 0, main_h, max_x)
+                elif self.zoomed_pane == 'telemetry':
+                    self._render_telemetry(stdscr, 1, 0, main_h, max_x)
+                else:
+                    if self.mem_view_mode == 'console':
+                        self._render_console_view(stdscr, 1, 0, main_h, max_x)
+                    elif self.mem_view_mode == 'stack':
+                        self._render_stack_view(stdscr, 1, 0, main_h, max_x)
+                    else:
+                        self._render_memory(stdscr, 1, 0, main_h, max_x)
             else:
-                self._render_memory(stdscr, 1 + reg_h + telem_h, left_w, mem_h, right_w)
+                left_w = min(50, int(max_x * 0.44))
+                right_w = max_x - left_w - 1
+                disasm_h = main_h
+
+                if self.show_telemetry:
+                    reg_h = min(10, max(8, main_h // 3))
+                    telem_h = min(9, max(7, main_h // 3))
+                    mem_h = main_h - reg_h - telem_h
+                else:
+                    telem_h = 0
+                    reg_h = min(11, max(8, main_h // 3))
+                    mem_h = main_h - reg_h
+
+                self._render_disassembly(stdscr, 1, 0, disasm_h, left_w)
+                self._render_registers(stdscr, 1, left_w, reg_h, right_w)
+
+                if self.show_telemetry:
+                    self._render_telemetry(stdscr, 1 + reg_h, left_w, telem_h, right_w)
+
+                mem_y = 1 + reg_h + telem_h
+                if self.mem_view_mode == 'console':
+                    self._render_console_view(stdscr, mem_y, left_w, mem_h, right_w)
+                elif self.mem_view_mode == 'stack':
+                    self._render_stack_view(stdscr, mem_y, left_w, mem_h, right_w)
+                else:
+                    self._render_memory(stdscr, mem_y, left_w, mem_h, right_w)
 
             # Footer
             self._render_footer(stdscr, max_y, max_x)
 
-            # Floating Help Modal (if active)
+            # Overlays: Floating Help Modal or LazyVim Which-Key Menu
             if self.show_help:
                 self._render_help_modal(stdscr, max_y, max_x)
+            elif self.show_leader_menu:
+                self._render_leader_menu(stdscr, max_y, max_x)
 
             stdscr.refresh()
 
@@ -265,15 +306,14 @@ class EmulatorTUI:
     def _render_header(self, win, max_x):
         state_str = "RUNNING" if self.running else ("HALTED" if self.cpu.check_done() else "PAUSED")
         state_color = curses.color_pair(2) if self.running else (curses.color_pair(4) if self.cpu.check_done() else curses.color_pair(3))
-        
-        # Truncate long paths: show up to last 2 path components
+
         parts = self.asm_filepath.replace('\\', '/').split('/')
         filename = '/'.join(parts[-2:]) if len(parts) > 2 else self.asm_filepath
-        # Add execution speed to header
         speed_str = f"{1.0/self.step_delay:.0f} steps/s" if self.step_delay > 0 else "Max"
         cs = self.BIU.reg.get('CS', 0)
         ip = self.BIU.reg.get('IP', 0)
-        hdr_text = f" 8086 TUI │ {filename} │ CS:IP={cs:04X}:{ip:04X}h │ ⚡{speed_str} │ Cycles:{self.cpu.cycle_count} │ "
+        zoom_str = f" [ZOOM:{self.zoomed_pane.upper()}]" if self.zoomed_pane else ""
+        hdr_text = f" 8086 TUI │ {filename}{zoom_str} │ CS:IP={cs:04X}:{ip:04X}h │ ⚡{speed_str} │ Cycles:{self.cpu.cycle_count} │ "
         self._safe_addstr(win, 0, 0, hdr_text, curses.color_pair(6) | curses.A_BOLD)
         self._safe_addstr(win, 0, len(hdr_text), f"[{state_str}] ", state_color | curses.A_BOLD)
 
@@ -321,7 +361,8 @@ class EmulatorTUI:
             self._safe_addstr(win, y + 1 + line_row, x + 1, line_text.ljust(w - 2), attr)
 
     def _render_registers(self, win, y, x, h, w):
-        self._draw_box(win, y, x, h, w, "CPU REGISTERS & FLAGS")
+        is_focused = (self.focused_pane == 'registers')
+        self._draw_box(win, y, x, h, w, "CPU REGISTERS & FLAGS", is_focused)
 
         eu_reg = self.EU.reg
         ax = eu_reg.get('AX', 0)
@@ -395,13 +436,13 @@ class EmulatorTUI:
             col_x += len(f_str)
 
     def _render_telemetry(self, win, y, x, h, w):
-        self._draw_box(win, y, x, h, w, "VIRTUAL HARDWARE PERIPHERALS")
+        is_focused = (self.focused_pane == 'telemetry')
+        self._draw_box(win, y, x, h, w, "VIRTUAL HARDWARE PERIPHERALS", is_focused)
 
         # Port 4: Traffic Lights
         tl_dev = self.EU.peripherals.get_device(4) if hasattr(self.EU, 'peripherals') else None
         tl_val = tl_dev.state if tl_dev else 0
 
-        # Bit parsing: 0-2 N, 3-5 W, 6-8 S, 9-11 E
         dirs = ["North", "West", "South", "East"]
         lamps = []
         for d in range(4):
@@ -435,14 +476,16 @@ class EmulatorTUI:
         vid_text = f" [Video Display 0xB8000]  Mode: 80x25 Color Text  Cursor: (Row: {vid_r:02d}, Col: {vid_c:02d})  Status: Mirror Active"
         self._safe_addstr(win, y + 5, x + 2, vid_text, curses.color_pair(1))
 
-        # Console log output — show last 2 lines of program output
-        out_lines = [l for l in self.EU.output.split("\n") if l.strip()]
+        # Console log output preview
+        out_lines = [l for l in self.EU.output.splitlines() if l.strip()]
         if out_lines:
             out1 = out_lines[-1] if len(out_lines) >= 1 else ""
             out2 = out_lines[-2] if len(out_lines) >= 2 else ""
             if out2:
-                self._safe_addstr(win, y + 6, x + 2, f" ▸ {out2[:w-6]}", curses.color_pair(8))
-            self._safe_addstr(win, y + 7, x + 2, f" ▸ {out1[:w-6]}", curses.color_pair(2) | curses.A_BOLD)
+                clean_out2 = out2.replace("> " * 16, "").strip()
+                self._safe_addstr(win, y + 6, x + 2, f" ▸ {clean_out2[:w-6]}", curses.color_pair(8))
+            clean_out1 = out1.replace("> " * 16, "").strip()
+            self._safe_addstr(win, y + 7, x + 2, f" ▸ {clean_out1[:w-6]}", curses.color_pair(2) | curses.A_BOLD)
         else:
             self._safe_addstr(win, y + 7, x + 2, " Console: (no output yet)", curses.color_pair(8))
 
@@ -485,7 +528,7 @@ class EmulatorTUI:
             ascii_str = "".join(ascii_chars)
 
             row_text = f" {row_addr:05X}:  {hex_str:<49} │ {ascii_str}"
-            self._safe_addstr(win, y + 1 + row, x + 1, row_text, curses.color_pair(2) if row % 2 == 0 else curses.A_NORMAL)
+            self._safe_addstr(win, y + 1 + row, x + 1, row_text.ljust(w - 2), curses.color_pair(2) if row % 2 == 0 else curses.A_NORMAL)
 
     def _render_stack_view(self, win, y, x, h, w):
         """Render the SS:SP stack view in the memory inspector area."""
@@ -497,7 +540,6 @@ class EmulatorTUI:
 
         content_h = max(1, h - 2)
         ss_phys = ss << 4
-        # SS:SP points to current top of stack; show 8 word entries going upward
         num_entries = min(content_h, 12)
 
         self._safe_addstr(win, y + 1, x + 2,
@@ -524,16 +566,73 @@ class EmulatorTUI:
             else:
                 self._safe_addstr(win, row, x + 2, f"  (address {phys:05X}h out of range)", curses.color_pair(8))
 
-    def _render_footer(self, win, max_y, max_x):
-        hotkeys = "[s] Step  [c] Run  [p] Pause  [b] Break  [Tab] Pane  [k/j] Nav  [m] MemSeg  [v] StackView  [?] Help  [q] Quit"
-        self._safe_addstr(win, max_y - 2, 0, f" {hotkeys}".ljust(max_x), curses.color_pair(6) | curses.A_BOLD)
+    def _render_console_view(self, win, y, x, h, w):
+        """Render full scrollable program output (OUT commands, DOS strings)."""
+        is_focused = (self.focused_pane == 'memory')
+        title = "PROGRAM CONSOLE OUTPUT (OUT / DOS INT 21H)"
+        self._draw_box(win, y, x, h, w, title, is_focused)
 
-        status_line = f" MSG: {self.status_msg}"
+        content_h = max(1, h - 2)
+        lines = [l for l in self.EU.output.splitlines() if l.strip()]
+
+        if not lines:
+            self._safe_addstr(win, y + 1, x + 2, "No program output generated yet.", curses.color_pair(8))
+            self._safe_addstr(win, y + 2, x + 2, "Any 'OUT <port>, AL' or DOS 'INT 21H' output displays here cleanly.", curses.color_pair(8))
+            return
+
+        total_lines = len(lines)
+        if total_lines <= content_h:
+            start_idx = 0
+        else:
+            if self.console_scroll_offset == 0:
+                start_idx = total_lines - content_h
+            else:
+                start_idx = max(0, min(total_lines - content_h, self.console_scroll_offset))
+
+        visible = lines[start_idx:start_idx + content_h]
+        for idx, line in enumerate(visible):
+            line_no = start_idx + idx + 1
+            clean_line = line.replace("> " * 16, "").strip()
+            row_text = f" {line_no:02d} │ {clean_line}"
+            self._safe_addstr(win, y + 1 + idx, x + 1, row_text.ljust(w - 2), curses.color_pair(2) | curses.A_BOLD)
+
+    def _render_footer(self, win, max_y, max_x):
+        hotkeys = " [Space] Leader  [s] Step  [c] Run  [p] Pause  [z] Zoom  [t] Telem  [o/v] View  [w] Window  [?] Help  [q] Quit"
+        self._safe_addstr(win, max_y - 2, 0, f"{hotkeys}".ljust(max_x), curses.color_pair(6) | curses.A_BOLD)
+
+        status_line = f" NORMAL │ Window: [{self.focused_pane.upper()}] │ MSG: {self.status_msg}"
         self._safe_addstr(win, max_y - 1, 0, status_line.ljust(max_x), curses.color_pair(3))
 
+    def _render_leader_menu(self, win, max_y, max_x):
+        """LazyVim-style Which-Key floating menu overlay at the bottom."""
+        menu_h = 7
+        menu_w = min(86, max_x - 2)
+        start_y = max_y - menu_h - 2
+        start_x = max(1, (max_x - menu_w) // 2)
+
+        # Clear background of menu
+        for r in range(start_y, start_y + menu_h):
+            self._safe_addstr(win, r, start_x, " " * menu_w, curses.color_pair(6))
+
+        self._draw_box(win, start_y, start_x, menu_h, menu_w, "WHICH-KEY (Space Leader)", True)
+
+        commands = [
+            [("s", "Step 1"), ("c", "Run Continuous"), ("p", "Pause"), ("b", "Toggle Break")],
+            [("z", "Zoom Window"), ("t", "Toggle Telem"), ("o", "Console Output"), ("v", "Stack View")],
+            [("1-4", "Jump Window"), ("w", "Next Window"), ("r", "Reset CPU"), ("q", "Quit TUI")]
+        ]
+
+        for row_idx, row_items in enumerate(commands):
+            curr_y = start_y + 1 + row_idx * 2
+            col_x = start_x + 3
+            for key_str, desc in row_items:
+                self._safe_addstr(win, curr_y, col_x, f"[{key_str}]", curses.color_pair(3) | curses.A_BOLD)
+                self._safe_addstr(win, curr_y, col_x + len(key_str) + 3, desc, curses.color_pair(2))
+                col_x += 20
+
     def _render_help_modal(self, win, max_y, max_x):
-        modal_w = min(72, max_x - 4)
-        modal_h = min(20, max_y - 4)
+        modal_w = min(74, max_x - 4)
+        modal_h = min(22, max_y - 4)
         start_y = max(1, (max_y - modal_h) // 2)
         start_x = max(1, (max_x - modal_w) // 2)
 
@@ -544,25 +643,28 @@ class EmulatorTUI:
         self._draw_box(win, start_y, start_x, modal_h, modal_w, "KEYBOARD SHORTCUTS & HELP", True)
 
         help_lines = [
-            ("Execution Controls:", True),
-            ("  [s] / [Space]     Single-step one instruction forward", False),
+            ("LazyVim Window Management:", True),
+            ("  [Space]           Open LazyVim Which-Key floating menu", False),
+            ("  [z]               Zoom / Maximize active window to full screen", False),
+            ("  [t]               Toggle Hardware Telemetry window on / off", False),
+            ("  [1] [2] [3] [4]   Jump directly to Disasm / Regs / Telem / Memory", False),
+            ("  [w] / [Tab]       Cycle active window forward ([W] backward)", False),
+            ("  [o]               Switch inspector to Program Console Output", False),
+            ("  [v]               Cycle inspector: Hex Dump <-> Stack <-> Console", False),
+            ("", False),
+            ("Execution & Debugging:", True),
+            ("  [s] / [Enter]     Single-step one instruction forward", False),
             ("  [c]               Continue running continuously", False),
             ("  [p]               Pause continuous execution", False),
             ("  [b]               Toggle breakpoint at current/selected IP", False),
             ("  [r]               Reset CPU and reload program", False),
             ("  [+] / [-]         Increase / decrease execution speed", False),
             ("", False),
-            ("Navigation & Inspection:", True),
-            ("  [Tab]             Switch focus (Disassembly <-> Memory)", False),
-            ("  [k] / [↑]         Move cursor up / scroll memory up", False),
-            ("  [j] / [↓]         Move cursor down / scroll memory down", False),
-            ("  [PgUp] / [PgDn]   Scroll memory by 128 bytes", False),
+            ("Navigation Motions (Vim):", True),
+            ("  [k] / [j]         Move up / down in active window", False),
+            ("  [g] / [G]         Jump to top / bottom of active window", False),
             ("  [m]               Cycle memory segment (DS, CS, SS, ES, VIDEO)", False),
-            ("", False),
-            ("  [?] / [h]         Toggle this help window", False),
-            ("  [q]               Quit TUI", False),
-            ("", False),
-            ("               Press any key to close this help window", True)
+            ("  [q]               Quit TUI", False)
         ]
 
         for idx, (line, is_header) in enumerate(help_lines):
@@ -577,6 +679,18 @@ class EmulatorTUI:
             self.show_help = False
             return True
 
+        # If Leader menu is open, handle key or dismiss
+        if self.show_leader_menu:
+            self.show_leader_menu = False
+            if key in [ord(' '), 27]: # Space or Esc closes menu
+                return True
+            # Otherwise proceed to execute the command corresponding to `key`!
+
+        # Leader key trigger
+        if key == ord(' '):
+            self.show_leader_menu = True
+            return True
+
         if key in [ord('q'), ord('Q')]:
             return False
 
@@ -584,11 +698,66 @@ class EmulatorTUI:
             self.show_help = True
             return True
 
-        elif key in [9]:  # Tab key
-            self.focused_pane = 'memory' if self.focused_pane == 'disasm' else 'disasm'
-            self.status_msg = f"Active pane switched to [{self.focused_pane.upper()}]."
+        # Window navigation: 1, 2, 3, 4
+        elif key == ord('1'):
+            self.focused_pane = 'disasm'
+            self.status_msg = "Window [1: DISASSEMBLY] focused."
+        elif key == ord('2'):
+            self.focused_pane = 'registers'
+            self.status_msg = "Window [2: REGISTERS] focused."
+        elif key == ord('3'):
+            if self.show_telemetry:
+                self.focused_pane = 'telemetry'
+                self.status_msg = "Window [3: TELEMETRY] focused."
+            else:
+                self.status_msg = "Telemetry window is hidden (press [t] to show)."
+        elif key == ord('4'):
+            self.focused_pane = 'memory'
+            self.status_msg = f"Window [4: {self.mem_view_mode.upper()}] focused."
 
-        elif key in [ord('s'), ord('S'), ord(' '), ord('\n'), 10]:
+        # Window cycle: w or Tab
+        elif key in [9, ord('w'), ord('W')]:  # Tab or w
+            panes = ['disasm', 'registers']
+            if self.show_telemetry:
+                panes.append('telemetry')
+            panes.append('memory')
+            idx = panes.index(self.focused_pane) if self.focused_pane in panes else 0
+            if key == ord('W'):
+                self.focused_pane = panes[(idx - 1) % len(panes)]
+            else:
+                self.focused_pane = panes[(idx + 1) % len(panes)]
+            self.status_msg = f"Active window: [{self.focused_pane.upper()}]."
+
+        # Window toggles: t (telemetry), z (zoom)
+        elif key in [ord('t'), ord('T')]:
+            self.show_telemetry = not self.show_telemetry
+            if not self.show_telemetry and self.focused_pane == 'telemetry':
+                self.focused_pane = 'memory'
+            self.status_msg = f"Hardware telemetry window: {'SHOWN' if self.show_telemetry else 'HIDDEN'}."
+
+        elif key in [ord('z'), ord('Z')]:
+            if self.zoomed_pane:
+                self.zoomed_pane = None
+                self.status_msg = "Restored split window layout."
+            else:
+                self.zoomed_pane = self.focused_pane
+                self.status_msg = f"Zoomed window [{self.zoomed_pane.upper()}] to full screen."
+
+        # Inspector view modes: o (console output), v (stack/hex toggle)
+        elif key in [ord('o'), ord('O')]:
+            self.mem_view_mode = 'console' if self.mem_view_mode != 'console' else 'hex'
+            self.focused_pane = 'memory'
+            self.status_msg = f"Inspector mode: [{self.mem_view_mode.upper()}]."
+
+        elif key in [ord('v'), ord('V')]:
+            modes = ['hex', 'stack', 'console']
+            cur_idx = modes.index(self.mem_view_mode) if self.mem_view_mode in modes else 0
+            self.mem_view_mode = modes[(cur_idx + 1) % len(modes)]
+            self.focused_pane = 'memory'
+            self.status_msg = f"Inspector mode: [{self.mem_view_mode.upper()}]."
+
+        # Step and run
+        elif key in [ord('s'), ord('S'), ord('\n'), 10]:
             self.running = False
             self.follow_ip = True
             self.step()
@@ -619,40 +788,59 @@ class EmulatorTUI:
                 self.breakpoints.add(target_ip)
                 self.status_msg = f"Added breakpoint at IP={target_ip:04X}h"
 
+        # Directional navigation: j / k / Down / Up
         elif key in [ord('k'), ord('K'), curses.KEY_UP]:
             if self.focused_pane == 'disasm':
                 self.follow_ip = False
                 self.disasm_cursor_idx = max(0, self.disasm_cursor_idx - 1)
-            else:
-                self.mem_offset = max(0, self.mem_offset - 16)
+            elif self.focused_pane == 'memory':
+                if self.mem_view_mode == 'console':
+                    self.console_scroll_offset = max(0, self.console_scroll_offset - 1)
+                else:
+                    self.mem_offset = max(0, self.mem_offset - 16)
 
         elif key in [ord('j'), ord('J'), curses.KEY_DOWN]:
             if self.focused_pane == 'disasm':
                 self.follow_ip = False
                 self.disasm_cursor_idx = min(len(self.instructions) - 1, self.disasm_cursor_idx + 1)
-            else:
-                self.mem_offset = min(0xFFFF, self.mem_offset + 16)
+            elif self.focused_pane == 'memory':
+                if self.mem_view_mode == 'console':
+                    self.console_scroll_offset += 1
+                else:
+                    self.mem_offset = min(0xFFFF, self.mem_offset + 16)
+
+        # Vim jump to top / bottom: g / G
+        elif key in [ord('g'), curses.KEY_HOME]:
+            if self.focused_pane == 'disasm':
+                self.disasm_cursor_idx = 0
+            elif self.focused_pane == 'memory':
+                self.mem_offset = 0
+                self.console_scroll_offset = 0
+            self.status_msg = "Jumped to beginning."
+
+        elif key in [ord('G'), curses.KEY_END]:
+            if self.focused_pane == 'disasm':
+                self.disasm_cursor_idx = max(0, len(self.instructions) - 1)
+            elif self.focused_pane == 'memory':
+                self.mem_offset = 0xFF00
+            self.status_msg = "Jumped to end."
 
         elif key in [curses.KEY_PPAGE]:  # Page Up
             if self.focused_pane == 'disasm':
                 self.disasm_cursor_idx = max(0, self.disasm_cursor_idx - 10)
-            else:
+            elif self.focused_pane == 'memory':
                 self.mem_offset = max(0, self.mem_offset - 128)
 
         elif key in [curses.KEY_NPAGE]:  # Page Down
             if self.focused_pane == 'disasm':
                 self.disasm_cursor_idx = min(len(self.instructions) - 1, self.disasm_cursor_idx + 10)
-            else:
+            elif self.focused_pane == 'memory':
                 self.mem_offset = min(0xFFFF, self.mem_offset + 128)
 
         elif key in [ord('m'), ord('M')]:
             self.mem_seg_idx = (self.mem_seg_idx + 1) % len(self.mem_segments)
             self.mem_offset = 0
-            self.status_msg = f"Memory inspector switched to segment [{self.mem_segments[self.mem_seg_idx]}]."
-
-        elif key in [ord('v'), ord('V')]:
-            self.mem_view_mode = 'stack' if self.mem_view_mode == 'hex' else 'hex'
-            self.status_msg = f"Memory view mode: {self.mem_view_mode.upper()}."
+            self.status_msg = f"Memory segment: [{self.mem_segments[self.mem_seg_idx]}]."
 
         elif key in [ord('+'), ord('=')]:
             self.step_delay = max(0.005, self.step_delay * 0.7)
