@@ -55,7 +55,10 @@ def main():
         asm_code = file.read()
 
     assembler = Assembler(SEG_INIT)
-    exe_file = assembler.compile(asm_code)
+    try:
+        exe_file = assembler.compile(asm_code)
+    except Exception as err:
+        sys.exit(f"\n{err}\n")
     memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
     memory.load(exe_file) # load code segment
 

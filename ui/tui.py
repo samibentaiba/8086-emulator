@@ -74,7 +74,11 @@ class EmulatorTUI:
 
         # Reset and compile
         self.assembler = Assembler(SEG_INIT)
-        self.exe_file = self.assembler.compile(self.asm_code)
+        try:
+            self.exe_file = self.assembler.compile(self.asm_code)
+        except Exception as err:
+            print(f"\n{err}\n")
+            sys.exit(1)
         self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
         self.memory.load(self.exe_file)
 
