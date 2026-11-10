@@ -54,6 +54,7 @@ class EmulatorTUI:
         self.mem_segments = ['DS', 'CS', 'SS', 'ES', 'VIDEO']
         self.mem_seg_idx = 0
         self.mem_offset = 0
+        self.mem_view_mode = 'hex'  # 'hex' or 'stack'
 
         # Previous register state for change highlighting
         self.prev_regs = {}
@@ -80,6 +81,7 @@ class EmulatorTUI:
         self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.exe_file, self.memory)
         self.EU = execution_unit.execution_unit(self.BIU, int_msg=False)
         self.cpu = CPU(self.BIU, self.EU, gui_mode=False)
+        self.cpu.tui_mode = True  # Suppress interactive debug() prompt in TUI mode
 
         # Cache instructions list with clean formatting
         cs_space = self.exe_file.space.get('CS', [])
@@ -229,7 +231,10 @@ class EmulatorTUI:
             self._render_disassembly(stdscr, 1, 0, disasm_h, left_w)
             self._render_registers(stdscr, 1, left_w, reg_h, right_w)
             self._render_telemetry(stdscr, 1 + reg_h, left_w, telem_h, right_w)
-            self._render_memory(stdscr, 1 + reg_h + telem_h, left_w, mem_h, right_w)
+            if self.mem_view_mode == 'stack':
+                self._render_stack_view(stdscr, 1 + reg_h + telem_h, left_w, mem_h, right_w)
+            else:
+                self._render_memory(stdscr, 1 + reg_h + telem_h, left_w, mem_h, right_w)
 
             # Footer
             self._render_footer(stdscr, max_y, max_x)
@@ -257,8 +262,14 @@ class EmulatorTUI:
         state_str = "RUNNING" if self.running else ("HALTED" if self.cpu.check_done() else "PAUSED")
         state_color = curses.color_pair(2) if self.running else (curses.color_pair(4) if self.cpu.check_done() else curses.color_pair(3))
         
-        filename = os.path.basename(self.asm_filepath)
-        hdr_text = f" 8086 EMULATOR TUI │ File: {filename} │ Clock Cycles: {self.cpu.cycle_count} │ State: "
+        # Truncate long paths: show up to last 2 path components
+        parts = self.asm_filepath.replace('\\', '/').split('/')
+        filename = '/'.join(parts[-2:]) if len(parts) > 2 else self.asm_filepath
+        # Add execution speed to header
+        speed_str = f"{1.0/self.step_delay:.0f} steps/s" if self.step_delay > 0 else "Max"
+        cs = self.BIU.reg.get('CS', 0)
+        ip = self.BIU.reg.get('IP', 0)
+        hdr_text = f" 8086 TUI │ {filename} │ CS:IP={cs:04X}:{ip:04X}h │ ⚡{speed_str} │ Cycles:{self.cpu.cycle_count} │ "
         self._safe_addstr(win, 0, 0, hdr_text, curses.color_pair(6) | curses.A_BOLD)
         self._safe_addstr(win, 0, len(hdr_text), f"[{state_str}] ", state_color | curses.A_BOLD)
 
@@ -420,10 +431,16 @@ class EmulatorTUI:
         vid_text = f" [Video Display 0xB8000]  Mode: 80x25 Color Text  Cursor: (Row: {vid_r:02d}, Col: {vid_c:02d})  Status: Mirror Active"
         self._safe_addstr(win, y + 5, x + 2, vid_text, curses.color_pair(1))
 
-        # Console log output
-        last_out = self.EU.output.strip().split("\n")[-1] if self.EU.output.strip() else "System idle."
-        out_text = f" Console Log: {last_out[:w-16]}"
-        self._safe_addstr(win, y + 7, x + 2, out_text, curses.color_pair(8))
+        # Console log output — show last 2 lines of program output
+        out_lines = [l for l in self.EU.output.split("\n") if l.strip()]
+        if out_lines:
+            out1 = out_lines[-1] if len(out_lines) >= 1 else ""
+            out2 = out_lines[-2] if len(out_lines) >= 2 else ""
+            if out2:
+                self._safe_addstr(win, y + 6, x + 2, f" ▸ {out2[:w-6]}", curses.color_pair(8))
+            self._safe_addstr(win, y + 7, x + 2, f" ▸ {out1[:w-6]}", curses.color_pair(2) | curses.A_BOLD)
+        else:
+            self._safe_addstr(win, y + 7, x + 2, " Console: (no output yet)", curses.color_pair(8))
 
     def _render_memory(self, win, y, x, h, w):
         is_focused = (self.focused_pane == 'memory')
@@ -466,8 +483,45 @@ class EmulatorTUI:
             row_text = f" {row_addr:05X}:  {hex_str:<49} │ {ascii_str}"
             self._safe_addstr(win, y + 1 + row, x + 1, row_text, curses.color_pair(2) if row % 2 == 0 else curses.A_NORMAL)
 
+    def _render_stack_view(self, win, y, x, h, w):
+        """Render the SS:SP stack view in the memory inspector area."""
+        is_focused = (self.focused_pane == 'memory')
+        ss = self.BIU.reg.get('SS', 0)
+        sp = self.EU.reg.get('SP', 0)
+        title = f"STACK VIEW [SS:{ss:04X}h SP:{sp:04X}h]"
+        self._draw_box(win, y, x, h, w, title, is_focused)
+
+        content_h = max(1, h - 2)
+        ss_phys = ss << 4
+        # SS:SP points to current top of stack; show 8 word entries going upward
+        num_entries = min(content_h, 12)
+
+        self._safe_addstr(win, y + 1, x + 2,
+            "  Offset    Physical   Value    (last pushed → top)",
+            curses.color_pair(1) | curses.A_BOLD)
+
+        for i in range(num_entries - 1):
+            row = y + 2 + i
+            if row >= y + h - 1:
+                break
+            word_offset = sp + (i * 2)
+            phys = ss_phys + word_offset
+            if phys + 1 < MEMORY_SIZE:
+                raw_lo = self.memory.rb(phys)
+                raw_hi = self.memory.rb(phys + 1)
+                lo = to_decimal(raw_lo[0]) if isinstance(raw_lo, list) else to_decimal(raw_lo)
+                hi = to_decimal(raw_hi[0]) if isinstance(raw_hi, list) else to_decimal(raw_hi)
+                word_val = (hi << 8) | lo
+                is_top = (i == 0)
+                prefix = "▶ SP+%02X" % (i * 2) if is_top else "  SP+%02X" % (i * 2)
+                row_text = f" {prefix}  {phys:05X}h   {word_val:04X}h = {word_val}"
+                attr = (curses.color_pair(3) | curses.A_BOLD) if is_top else curses.color_pair(2)
+                self._safe_addstr(win, row, x + 1, row_text.ljust(w - 2), attr)
+            else:
+                self._safe_addstr(win, row, x + 2, f"  (address {phys:05X}h out of range)", curses.color_pair(8))
+
     def _render_footer(self, win, max_y, max_x):
-        hotkeys = "[s] Step  [c] Run  [p] Pause  [b] Break  [Tab] Pane  [k/j] Navigate  [m] MemSeg  [?] Help  [q] Quit"
+        hotkeys = "[s] Step  [c] Run  [p] Pause  [b] Break  [Tab] Pane  [k/j] Nav  [m] MemSeg  [v] StackView  [?] Help  [q] Quit"
         self._safe_addstr(win, max_y - 2, 0, f" {hotkeys}".ljust(max_x), curses.color_pair(6) | curses.A_BOLD)
 
         status_line = f" MSG: {self.status_msg}"
@@ -591,6 +645,10 @@ class EmulatorTUI:
             self.mem_seg_idx = (self.mem_seg_idx + 1) % len(self.mem_segments)
             self.mem_offset = 0
             self.status_msg = f"Memory inspector switched to segment [{self.mem_segments[self.mem_seg_idx]}]."
+
+        elif key in [ord('v'), ord('V')]:
+            self.mem_view_mode = 'stack' if self.mem_view_mode == 'hex' else 'hex'
+            self.status_msg = f"Memory view mode: {self.mem_view_mode.upper()}."
 
         elif key in [ord('+'), ord('=')]:
             self.step_delay = max(0.005, self.step_delay * 0.7)

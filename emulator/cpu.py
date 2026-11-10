@@ -26,7 +26,7 @@ class CPU(object):
 
         if (debug or self.EU.interrupt):
             self.print_state()
-            if not self.gui_mode :
+            if not self.gui_mode and not getattr(self, 'tui_mode', False):
                 self.debug()
                 self.EU.interrupt = False
 
