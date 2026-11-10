@@ -1,3 +1,4 @@
+import os
 import sys
 import re
 import datetime
@@ -40,6 +41,29 @@ class execution_unit(object):
         self.output = ''
         from emulator.peripherals import PeripheralManager
         self.peripherals = PeripheralManager.get_instance()
+        self.file_handles = {}
+        self.next_handle = 5
+        self.video_display = None
+
+    @property
+    def video(self):
+        if self.video_display is None:
+            from emulator.peripherals.video_display import VideoDisplayDevice
+            self.video_display = VideoDisplayDevice(memory=self.bus.memory, enable_gui=True)
+        return self.video_display
+
+    def read_asciiz_from_mem(self, seg, offset):
+        """Read a null-terminated string from memory at seg:offset."""
+        addr = (seg << 4) + offset
+        chars = []
+        for _ in range(256):
+            b_list = self.bus.read_byte(addr)
+            val = to_decimal(b_list[0]) if isinstance(b_list, list) else to_decimal(b_list)
+            if val == 0:
+                break
+            chars.append(chr(val))
+            addr += 1
+        return "".join(chars)
 
     def print(self, string):
         # emulator print
@@ -1134,6 +1158,57 @@ class execution_unit(object):
                 count += 1
             self.print('\n')
 
+        elif ah == 0x06: # Direct console I/O
+            dl = self.read_reg('DL')
+            if dl == 0xFF:
+                # Direct non-blocking input
+                # Return AL = 0, ZF = 1 if no input
+                self.write_reg('AL', 0)
+                self.FR.zero = 1
+            else:
+                self.print(chr(dl))
+                if self.video_display:
+                    self.video.teletype_output(dl)
+
+        elif ah in [0x07, 0x08]: # Console input without echo
+            if self.int_msg:
+                self.print("Interrupt Routine: Console Input without Echo\n")
+            try:
+                char = input()
+                ch_code = ord(char[0]) if char else 0x0D
+            except Exception:
+                ch_code = 0x0D
+            self.write_reg('AL', ch_code)
+
+        elif ah == 0x0A: # Buffered keyboard input (DS:DX points to buffer)
+            if self.int_msg:
+                self.print("Interrupt Routine: Buffered Keyboard Input\n")
+            buf_addr = (self.read_reg('DS') << 4) + self.read_reg('DX')
+            b_max = self.bus.read_byte(buf_addr)
+            max_len = to_decimal(b_max[0]) if isinstance(b_max, list) else to_decimal(b_max)
+            try:
+                line = input()
+            except Exception:
+                line = ""
+            chars = line[:max(0, max_len - 1)]
+            # Write actual length at buffer + 1
+            self.bus.write_byte(buf_addr + 1, len(chars))
+            # Write characters starting at buffer + 2
+            for idx, ch in enumerate(chars):
+                self.bus.write_byte(buf_addr + 2 + idx, ord(ch))
+            # Terminate with CR (0x0D)
+            self.bus.write_byte(buf_addr + 2 + len(chars), 0x0D)
+
+        elif ah == 0x0B: # Get stdin status
+            self.write_reg('AL', 0xFF) # Ready
+
+        elif ah == 0x25: # Set interrupt vector (AL=int_type, DS:DX=vector)
+            int_type = self.read_reg('AL')
+            dx = self.read_reg('DX')
+            ds = self.read_reg('DS')
+            self.bus.write_word(int_type * 4, dx)
+            self.bus.write_word(int_type * 4 + 2, ds)
+
         elif ah == 0x2a: # Get date: CX:DH:DL=Year:Month:Day
             if self.int_msg:
                 self.print("Interrupt Routine: Read System Date\n")
@@ -1151,6 +1226,12 @@ class execution_unit(object):
             self.write_reg('DH', now.second)
             self.write_reg('DL', int(now.microsecond * 1e4))
         
+        elif ah == 0x30: # Get DOS Version (AL=major=5, AH=minor=0)
+            self.write_reg('AL', 5)
+            self.write_reg('AH', 0)
+            self.write_reg('BH', 0xFF)
+            self.write_reg('BL', 0)
+
         elif ah == 0x35:
             if self.int_msg:
                 self.print("Interrupt Routine: Get Interrupt Vector\n")
@@ -1158,6 +1239,136 @@ class execution_unit(object):
             self.write_reg('BX', self.get_int_from_adr(int_type * 4))
             self.write_reg('ES', self.get_int_from_adr(int_type * 4 + 2))
         
+        # File Operations
+        elif ah == 0x3C: # Create / Truncate file (DS:DX=ASCIIZ filename, CX=attribute)
+            filename = self.read_asciiz_from_mem(self.read_reg('DS'), self.read_reg('DX'))
+            try:
+                f = open(filename, 'w+b')
+                handle = self.next_handle
+                self.next_handle += 1
+                self.file_handles[handle] = f
+                self.write_reg('AX', handle)
+                self.FR.carry = 0
+            except Exception:
+                self.write_reg('AX', 3) # Path not found / access denied
+                self.FR.carry = 1
+
+        elif ah == 0x3D: # Open file (DS:DX=ASCIIZ filename, AL=mode: 0=R, 1=W, 2=RW)
+            filename = self.read_asciiz_from_mem(self.read_reg('DS'), self.read_reg('DX'))
+            mode_flag = al & 0x03
+            mode_str = 'rb' if mode_flag == 0 else ('wb' if mode_flag == 1 else 'r+b')
+            try:
+                f = open(filename, mode_str)
+                handle = self.next_handle
+                self.next_handle += 1
+                self.file_handles[handle] = f
+                self.write_reg('AX', handle)
+                self.FR.carry = 0
+            except Exception:
+                self.write_reg('AX', 2) # File not found
+                self.FR.carry = 1
+
+        elif ah == 0x3E: # Close file (BX=handle)
+            bx = self.read_reg('BX')
+            if bx in self.file_handles:
+                try:
+                    self.file_handles[bx].close()
+                except Exception:
+                    pass
+                del self.file_handles[bx]
+                self.FR.carry = 0
+            else:
+                self.write_reg('AX', 6) # Invalid handle
+                self.FR.carry = 1
+
+        elif ah == 0x3F: # Read from file or device (BX=handle, CX=count, DS:DX=buffer)
+            bx = self.read_reg('BX')
+            cx = self.read_reg('CX')
+            buf_addr = (self.read_reg('DS') << 4) + self.read_reg('DX')
+            if bx == 0: # Stdin
+                try:
+                    data = sys.stdin.buffer.read(cx)
+                except Exception:
+                    data = b""
+                for idx, byte_val in enumerate(data):
+                    self.bus.write_byte(buf_addr + idx, byte_val)
+                self.write_reg('AX', len(data))
+                self.FR.carry = 0
+            elif bx in self.file_handles:
+                try:
+                    data = self.file_handles[bx].read(cx)
+                    for idx, byte_val in enumerate(data):
+                        self.bus.write_byte(buf_addr + idx, byte_val)
+                    self.write_reg('AX', len(data))
+                    self.FR.carry = 0
+                except Exception:
+                    self.write_reg('AX', 5) # Access denied
+                    self.FR.carry = 1
+            else:
+                self.write_reg('AX', 6) # Invalid handle
+                self.FR.carry = 1
+
+        elif ah == 0x40: # Write to file or device (BX=handle, CX=count, DS:DX=buffer)
+            bx = self.read_reg('BX')
+            cx = self.read_reg('CX')
+            buf_addr = (self.read_reg('DS') << 4) + self.read_reg('DX')
+            byte_list = []
+            for idx in range(cx):
+                b = self.bus.read_byte(buf_addr + idx)
+                val = to_decimal(b[0]) if isinstance(b, list) else to_decimal(b)
+                byte_list.append(val & 0xFF)
+            data_bytes = bytes(byte_list)
+
+            if bx in (1, 2): # Stdout / Stderr
+                text = data_bytes.decode('latin1', errors='replace')
+                self.print(text)
+                if self.video_display:
+                    for ch in text:
+                        self.video.teletype_output(ord(ch))
+                self.write_reg('AX', cx)
+                self.FR.carry = 0
+            elif bx in self.file_handles:
+                try:
+                    self.file_handles[bx].write(data_bytes)
+                    self.file_handles[bx].flush()
+                    self.write_reg('AX', cx)
+                    self.FR.carry = 0
+                except Exception:
+                    self.write_reg('AX', 5)
+                    self.FR.carry = 1
+            else:
+                self.write_reg('AX', 6)
+                self.FR.carry = 1
+
+        elif ah == 0x41: # Delete file (DS:DX=ASCIIZ filename)
+            filename = self.read_asciiz_from_mem(self.read_reg('DS'), self.read_reg('DX'))
+            try:
+                if os.path.exists(filename):
+                    os.remove(filename)
+                self.FR.carry = 0
+            except Exception:
+                self.write_reg('AX', 2) # File not found
+                self.FR.carry = 1
+
+        elif ah == 0x42: # LSEEK (BX=handle, AL=whence, CX:DX=offset)
+            bx = self.read_reg('BX')
+            whence = al & 0x03 # 0=start, 1=current, 2=end
+            cx_val = self.read_reg('CX')
+            dx_val = self.read_reg('DX')
+            offset = (cx_val << 16) | dx_val
+            if bx in self.file_handles:
+                try:
+                    new_pos = self.file_handles[bx].seek(offset, whence)
+                    self.write_reg('DX', (new_pos >> 16) & 0xFFFF)
+                    self.write_reg('AX', new_pos & 0xFFFF)
+                    self.FR.carry = 0
+                except Exception:
+                    self.write_reg('AX', 1) # Invalid function
+                    self.FR.carry = 1
+            else:
+                self.write_reg('AX', 6)
+                self.FR.carry = 1
+
         elif ah == 0x4c: # Exit with return code
             if self.int_msg:
                 self.print("Interrupt Routine: Terminate with Return Code\n")
@@ -1168,7 +1379,89 @@ class execution_unit(object):
             sys.exit("Interrupt Error")
 
     def bios_isr_10h(self):
-        pass
+        ah = self.read_reg('AH')
+        al = self.read_reg('AL')
+        bh = self.read_reg('BH')
+        bl = self.read_reg('BL')
+        cx = self.read_reg('CX')
+        dh = self.read_reg('DH')
+        dl = self.read_reg('DL')
+
+        if self.int_msg:
+            self.print(f"\nInvoking BIOS Video Interrupt 10H, AH={hex(ah)}\n")
+
+        if ah == 0x00: # Set video mode (AL = mode, e.g. 03h 80x25 text)
+            self.video.video_mode = al
+            self.video.clear_screen(attr=0x07)
+
+        elif ah == 0x01: # Set cursor shape (CH/CL)
+            pass
+
+        elif ah == 0x02: # Set cursor position (DH=row, DL=col)
+            self.video.set_cursor(dh, dl)
+
+        elif ah == 0x03: # Read cursor position (DH=row, DL=col, CH/CL=shape)
+            r, c = self.video.get_cursor()
+            self.write_reg('DH', r)
+            self.write_reg('DL', c)
+            self.write_reg('CX', 0x0607) # Standard cursor scan lines
+
+        elif ah == 0x06: # Scroll up / clear window (AL=lines, BH=attr, CH/CL=ul, DH/DL=lr)
+            if al == 0:
+                self.video.clear_screen(attr=bh)
+            else:
+                self.video.scroll_up(lines=al, attr=bh)
+
+        elif ah == 0x07: # Scroll down window
+            pass
+
+        elif ah == 0x08: # Read char and attribute at cursor
+            r, c = self.video.get_cursor()
+            char_code, attr = self.video.read_char_at(r, c)
+            self.write_reg('AL', char_code)
+            self.write_reg('AH', attr)
+
+        elif ah == 0x09: # Write char and attribute at cursor (AL=char, BL=attr, CX=count)
+            r, c = self.video.get_cursor()
+            count = max(1, cx)
+            for i in range(count):
+                curr_col = (c + i) % 80
+                curr_row = r + (c + i) // 80
+                if curr_row < 25:
+                    self.video.write_char_at(curr_row, curr_col, al, bl)
+            self.video.sync_display()
+
+        elif ah == 0x0A: # Write char only at cursor (AL=char, CX=count)
+            r, c = self.video.get_cursor()
+            count = max(1, cx)
+            for i in range(count):
+                curr_col = (c + i) % 80
+                curr_row = r + (c + i) // 80
+                if curr_row < 25:
+                    _, cur_attr = self.video.read_char_at(curr_row, curr_col)
+                    self.video.write_char_at(curr_row, curr_col, al, cur_attr)
+            self.video.sync_display()
+
+        elif ah == 0x0E: # Teletype output (AL=char, BL=foreground color)
+            attr = bl if bl != 0 else 0x07
+            self.video.teletype_output(al, attr)
+
+        elif ah == 0x13: # Write string (ES:BP=string, CX=length, DH=row, DL=col, BL=attr)
+            es = self.read_reg('ES')
+            bp = self.read_reg('BP')
+            addr = (es << 4) + bp
+            cur_r = dh
+            cur_c = dl
+            for i in range(cx):
+                b = self.bus.read_byte(addr + i)
+                char_val = to_decimal(b[0]) if isinstance(b, list) else to_decimal(b)
+                self.video.write_char_at(cur_r, cur_c, char_val, bl)
+                cur_c += 1
+                if cur_c >= 80:
+                    cur_c = 0
+                    cur_r += 1
+            self.video.set_cursor(cur_r, cur_c)
+            self.video.sync_display(force=True)
 
     def interrupt_handler(self, int_type):
         self.inc_reg('SP', -2) # Save context

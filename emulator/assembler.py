@@ -21,6 +21,10 @@ def to_decimal(num):
     # print(f"converting {num} to decimal")
     if isinstance(num, int):
         return int(num)
+    if (num.startswith("'") and num.endswith("'")) or (num.startswith('"') and num.endswith('"')):
+        inner = num[1:-1]
+        if len(inner) == 1:
+            return ord(inner)
     if num.startswith('0x'):
         return int(num, 16)
     if num.startswith('0X'):

@@ -122,3 +122,12 @@ class CPU(object):
         self.EU.print(f"CPU ran a total of {self.cycle_count} clock cycles\n")
         if hasattr(self.EU, 'peripherals') and self.EU.peripherals:
             self.EU.peripherals.close_all()
+        if hasattr(self.EU, 'video_display') and self.EU.video_display:
+            self.EU.video_display.close()
+        if hasattr(self.EU, 'file_handles'):
+            for f in list(self.EU.file_handles.values()):
+                try:
+                    f.close()
+                except Exception:
+                    pass
+            self.EU.file_handles.clear()
