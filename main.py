@@ -29,27 +29,28 @@ def main():
                "  python main.py ./tests/Requirement/bubble_sort.asm -i\n",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("file", help="Path to 8086 assembly source file (.asm)")
+    parser.add_argument("file", nargs="?", default=None, help="Path to 8086 assembly source file (.asm)")
     parser.add_argument("-t", "--tui", action="store_true", help="Launch interactive full-screen Neovim/GDB-style TUI debugger")
     parser.add_argument("-n", "--nodebug", action="store_true", help="Run without interactive debug prompts (continuous run)")
     parser.add_argument("-i", "--interrupt", action="store_true", help="Print interrupt execution information")
     parser.add_argument("-g", "--gui-windows", action="store_true", help="Spawn external GUI visualizer windows for peripherals")
 
-    if len(sys.argv) < 2:
+    args = parser.parse_args()
+
+    # If TUI mode requested, launch the interactive TUI (Neovim-style)
+    if args.tui:
+        from ui.tui import EmulatorTUI
+        target_file = args.file if args.file else "untitled.asm"
+        tui = EmulatorTUI(target_file, enable_gui_windows=args.gui_windows)
+        tui.run()
+        return
+
+    if not args.file:
         parser.print_help()
         sys.exit(1)
 
-    args = parser.parse_args()
-
     if not os.path.exists(args.file):
         sys.exit(f"Error: File '{args.file}' not found.")
-
-    # If TUI mode requested, launch the interactive TUI
-    if args.tui:
-        from ui.tui import EmulatorTUI
-        tui = EmulatorTUI(args.file, enable_gui_windows=args.gui_windows)
-        tui.run()
-        return
 
     with open(args.file, 'r', encoding='utf-8') as file:
         asm_code = file.read()

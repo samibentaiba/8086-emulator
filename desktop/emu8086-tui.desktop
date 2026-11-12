@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=8086 Emulator (TUI)
+GenericName=Intel 8086 Microprocessor Debugger & Modal Editor
+Comment=Interactive Neovim-style 8086 CPU emulator, modal code editor, and reverse debugger
+Exec=emu8086-tui %f
+Terminal=true
+Icon=emu8086
+Categories=Development;Debugger;IDE;Engineering;
+Keywords=8086;assembly;emulator;debugger;asm;neovim;tui;
+MimeType=text/x-asm;
+StartupNotify=true

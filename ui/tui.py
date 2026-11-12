@@ -33,9 +33,29 @@ SEG_INIT = {
 }
 
 
+DEFAULT_SKELETON = """DATA SEGMENT
+    ; Define variables here
+DATA ENDS
+
+CODE SEGMENT
+ASSUME CS:CODE, DS:DATA
+START:
+    MOV AX, DATA
+    MOV DS, AX
+
+    ; Write your 8086 assembly instructions here
+    MOV AX, 01234H
+
+    MOV AH, 4CH
+    INT 21H
+CODE ENDS
+END START
+"""
+
+
 class EmulatorTUI:
-    def __init__(self, asm_filepath, enable_gui_windows=False):
-        self.asm_filepath = asm_filepath
+    def __init__(self, asm_filepath="untitled.asm", enable_gui_windows=False):
+        self.asm_filepath = asm_filepath or "untitled.asm"
         self.enable_gui_windows = enable_gui_windows
         self.asm_code = ""
         self.source_lines = []
@@ -84,9 +104,20 @@ class EmulatorTUI:
         self._init_cpu()
 
     def _load_file(self):
-        with open(self.asm_filepath, 'r', encoding='utf-8') as f:
-            self.asm_code = f.read()
-        self.source_lines = self.asm_code.splitlines() if self.asm_code else [""]
+        if not self.asm_filepath:
+            self.asm_filepath = "untitled.asm"
+
+        if os.path.exists(self.asm_filepath):
+            with open(self.asm_filepath, 'r', encoding='utf-8') as f:
+                self.asm_code = f.read()
+            self.source_lines = self.asm_code.splitlines() if self.asm_code else [""]
+        else:
+            # Neovim-style: New file buffer initialized with starter template
+            self.asm_code = DEFAULT_SKELETON
+            self.source_lines = self.asm_code.splitlines()
+            self.modified = False
+            self.status_msg = f"[New File] '{os.path.basename(self.asm_filepath)}' -- [i] Edit, [s] Step, [<Space>w] Save."
+
         self.edit_row = 0
         self.edit_col = 0
         self.source_scroll_y = 0
@@ -188,6 +219,20 @@ class EmulatorTUI:
         except Exception as err:
             self.status_msg = f"AssemblyError: {err} (press 'i' to fix)"
 
+    @property
+    def filename(self):
+        """Return base name of current ASM file."""
+        return os.path.basename(self.asm_filepath)
+
+    @property
+    def file_path(self):
+        """Return full file path."""
+        return self.asm_filepath
+
+    @file_path.setter
+    def file_path(self, val):
+        self.asm_filepath = val
+
     def save_to_disk(self):
         """Save source code changes back to the .asm file."""
         try:
@@ -197,6 +242,8 @@ class EmulatorTUI:
             self.status_msg = f"Saved '{os.path.basename(self.asm_filepath)}' to disk."
         except Exception as err:
             self.status_msg = f"Error saving file: {err}"
+
+    save_source_file = save_to_disk
 
     def _snapshot_regs(self):
         snap = {}
@@ -265,6 +312,8 @@ class EmulatorTUI:
             self.running = False
             self.status_msg = "Already at start of execution (Cycle 0)."
             return False
+
+    step_backward = step_back
 
     def run(self):
         if curses is None:

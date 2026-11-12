@@ -10,6 +10,18 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 ---
 
 ## What's New in v5.2 (LazyVim Modal Editor, Time-Travel Debugging & Zero-Glitch Overhaul)
+- **Dual Applications: Standalone TUI & PyQt5 GUI**:
+  - **`emu8086-tui`**: Terminal User Interface application. Pure Python standard library + curses (zero external dependencies). Runs in any Linux/NixOS terminal, tmux, or SSH session.
+  - **`emu8086-gui`**: Desktop graphical workbench with memory inspection tables, visual code editor, and dedicated peripheral simulator windows. Transparent NixOS integration via `shell.nix`.
+  - **`emu8086`**: Unified CLI supporting headless execution (`-n`), interrupt traces (`-i`), and batch testing.
+- **Neovim-Style Terminal Workflow (`emu8086-tui [file.asm]`)**:
+  - Execute `emu8086-tui` directly from ANY directory in your terminal.
+  - Open existing `.asm` files or specify a new file name: non-existent files automatically open with a starter MASM template (`[New File]`), exactly like `nvim`.
+  - Press `i` to enter INSERT mode, `<Esc>` to return to NORMAL mode and re-assemble on the fly, and `<Space>w` to save directly to disk.
+- **NixOS & Linux Fast Installation (`./install.sh`)**:
+  - One-click installer links `emu8086-tui`, `emu8086-gui`, and `emu8086` into `~/.local/bin/`.
+  - Registers Desktop Applications (`.desktop`) in your system launcher with icons and `.asm` MIME associations.
+  - Native `shell.nix` environment for NixOS users (`nix-shell` provides PyQt5 with zero setup).
 - **Time-Travel Reverse Debugging ("Step Back" & "Run Backward")**:
   - `u` / `<Backspace>`: Single-step backward (rewind 1 instruction). Restores previous CPU registers, flags, stack, memory writes, and peripheral states. Reverted registers automatically highlight in bright yellow.
   - `C` / `U`: Run backward continuously (rewind until start or breakpoint).
@@ -71,14 +83,27 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 
 ## Running the Emulator
 
+### Quick Install (Linux & NixOS)
+To install the standalone CLI commands into `~/.local/bin` and create desktop application entries:
+```bash
+./install.sh
+```
+
 ### 1. Interactive Terminal User Interface (TUI)
-Launch the interactive full-screen debugger inside any standard terminal (including SSH, tmux, and Neovim terminal buffers):
+Launch the interactive full-screen debugger inside any standard terminal (including SSH, tmux, and Neovim terminal buffers) exactly like `nvim`:
 
 ```bash
-# Direct TUI entry point
-python3 tui.py ./tests/Requirement/bubble_sort.asm
+# Open an existing assembly file:
+emu8086-tui ./tests/Requirement/bubble_sort.asm
 
-# Or via main.py flag
+# Or create/edit a new file with starter MASM skeleton (like nvim new_file.asm):
+emu8086-tui my_program.asm
+
+# Or open a fresh scratchpad buffer:
+emu8086-tui
+
+# (Alternative python invocation)
+python3 tui.py ./tests/Requirement/bubble_sort.asm
 python3 main.py ./tests/Requirement/bubble_sort.asm -t
 ```
 
@@ -157,7 +182,14 @@ When paused in single-step debug mode, the following DOS `DEBUG`-style commands 
 Launch the PyQt5 desktop environment:
 
 ```bash
-python3 mainUI.py
+# Direct launcher command
+emu8086-gui [optional_file.asm]
+
+# On NixOS (using the included shell.nix)
+nix-shell --run "emu8086-gui"
+
+# Or direct python invocation
+python3 mainUI.py [optional_file.asm]
 ```
 
 ![](image/mainUI.png)

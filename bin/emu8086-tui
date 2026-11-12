@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# 8086 Emulator Interactive Terminal User Interface (TUI)
+# Neovim-style modal editor & time-travel debugger
+
+set -e
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
+export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
+
+exec python3 "$REPO_DIR/tui.py" "$@"

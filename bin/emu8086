@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# 8086 Emulator Unified Command
+# Runs Neovim-style TUI by default, or headless/debug CLI when flags (-n/-i) are passed.
+
+set -e
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
+export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
+
+# If user passes CLI-only flags (-n, -i, etc.), dispatch to main.py
+is_cli=0
+for arg in "$@"; do
+    if [ "$arg" = "-n" ] || [ "$arg" = "--nodebug" ] || [ "$arg" = "-i" ] || [ "$arg" = "--interrupt" ]; then
+        is_cli=1
+        break
+    fi
+done
+
+if [ $is_cli -eq 1 ]; then
+    exec python3 "$REPO_DIR/main.py" "$@"
+else
+    exec python3 "$REPO_DIR/tui.py" "$@"
+fi

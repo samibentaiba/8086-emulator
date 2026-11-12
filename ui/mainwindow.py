@@ -36,7 +36,7 @@ def _resource(*rsc):
     return os.path.join(directory, *rsc)
 
 class MainWindow(object):
-    def __init__(self, qApp=None):
+    def __init__(self, qApp=None, initial_file=None):
 
         self.gui = uic.loadUi(_resource('mainwindow.ui'))
         # Assembly editor get focus on start
@@ -46,7 +46,14 @@ class MainWindow(object):
 
         self.assembler = Assembler(SEG_INIT)
         self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
-        self.asmEdit.setPlainText(open(_resource('default.asm')).read())
+        if initial_file and os.path.exists(initial_file):
+            try:
+                with open(initial_file, 'r', encoding='utf-8') as f:
+                    self.asmEdit.setPlainText(f.read())
+            except Exception:
+                self.asmEdit.setPlainText(open(_resource('default.asm')).read())
+        else:
+            self.asmEdit.setPlainText(open(_resource('default.asm')).read())
 
         self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.assembler, self.memory)
         self.EU = execution_unit.execution_unit(self.BIU, int_msg=True)

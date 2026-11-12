@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# 8086 Emulator Desktop Graphical User Interface (GUI)
+# PyQt5-based visual debugger & microprocessor workbench
+# ==============================================================================
+
+set -e
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
+export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
+
+# 1. If system Python has PyQt5, run immediately
+if python3 -c "import PyQt5" >/dev/null 2>&1; then
+    exec python3 "$REPO_DIR/mainUI.py" "$@"
+fi
+
+# 2. If on NixOS / nix-shell is available, run inside the nix environment
+if command -v nix-shell >/dev/null 2>&1 && [ -f "$REPO_DIR/shell.nix" ]; then
+    exec nix-shell "$REPO_DIR/shell.nix" --run "python3 \"$REPO_DIR/mainUI.py\" \"$@\""
+fi
+
+# 3. Fallback: python3 mainUI.py will display a friendly multi-platform install guide
+exec python3 "$REPO_DIR/mainUI.py" "$@"

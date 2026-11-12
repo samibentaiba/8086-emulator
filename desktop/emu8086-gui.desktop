@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=8086 Emulator (GUI)
+GenericName=Intel 8086 Desktop Emulator Workbench
+Comment=PyQt5-based 8086 visual microprocessor simulator, editor, and peripheral visualizer
+Exec=emu8086-gui %f
+Terminal=false
+Icon=emu8086
+Categories=Development;Debugger;IDE;Engineering;
+Keywords=8086;assembly;emulator;debugger;asm;gui;pyqt;
+MimeType=text/x-asm;
+StartupNotify=true

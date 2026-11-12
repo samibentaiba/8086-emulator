@@ -26,8 +26,12 @@ gui = ["PyQt5>=5.15"]
 windows = ["windows-curses>=2.3"]
 
 [project.scripts]
-emu8086     = "main:main"
-emu8086-tui = "tui:main"
+emu8086      = "main:main"
+emu8086-tui  = "tui:main"
+emu8086-gui  = "mainUI:main"
+
+[project.gui-scripts]
+emu8086-gui-windowed = "mainUI:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

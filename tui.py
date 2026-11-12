@@ -33,38 +33,54 @@ from ui.tui import EmulatorTUI
 def print_help():
     print("""
 Antigravity 8086 Interactive Terminal User Interface (TUI)
+Neovim / LazyVim Modal Editor & Time-Travel Reverse Debugger
+
 Usage:
-    python3 tui.py <path_to_asm_file> [options]
+    emu8086-tui [file.asm] [options]
+    python3 tui.py [file.asm] [options]
+
+If [file.asm] is omitted or does not exist, a new buffer is created with
+a standard MASM skeleton ready to edit and save (exactly like Neovim).
 
 Options:
     -g, --gui-windows   Also spawn external Tkinter GUI visualizer windows
     -h, --help          Show this help message
 
-Keybindings inside TUI:
-    [s] or [Space]      Single-step forward
-    [c]                 Continue running continuously
-    [p]                 Pause continuous execution
-    [b]                 Toggle breakpoint on selected instruction
-    [Tab]               Switch active pane between Disassembly and Memory Inspector
-    [k] / [↑]           Navigate up / scroll memory up
-    [j] / [↓]           Navigate down / scroll memory down
-    [r]                 Reset CPU and reload program
-    [m]                 Cycle memory segment inspector (DS, CS, SS, ES, VIDEO)
-    [+] / [-]           Speed up / slow down continuous run speed
-    [q]                 Quit TUI
+Modal Editing (LazyVim Style):
+    [i]                 Enter INSERT mode at cursor
+    [a]                 Enter INSERT mode after cursor
+    [o] / [O]           Open new line below / above and enter INSERT mode
+    [Esc]               Return to NORMAL mode (automatically reassembles code)
+    [<Space>w]          Save buffer to disk
+
+Execution & Time-Travel Debugging:
+    [s] / [Space]       Single-step forward
+    [u]                 Step BACKWARD (Time-Travel Undo)
+    [c]                 Run continuously forward
+    [C]                 Run continuously backward (Rewind)
+    [p]                 Pause continuous run
+    [b]                 Toggle breakpoint at cursor line
+    [r]                 Reset CPU and reload initial state
+    [+] / [-]           Speed up / slow down execution
+
+Navigation & View:
+    [h] [j] [k] [l]     Vim directional navigation
+    [Tab] / [S-Tab]     Switch active pane
+    [m]                 Cycle memory segment (DS, CS, SS, ES, VIDEO)
+    [v]                 Toggle stack view
+    [t]                 Toggle hardware telemetry
+    [z]                 Toggle pane zoom (full-screen pane)
+    [?]                 Toggle cheat-sheet help
+    [q]                 Quit
 
 Examples:
-    python3 tui.py ./tests/Requirement/bubble_sort.asm
-    python3 tui.py ./tests/Inout/traffic_lights_test.asm
-    python3 tui.py ./tests/Inout/stepper_motor_test.asm
+    emu8086-tui                           # Open new buffer (untitled.asm)
+    emu8086-tui my_program.asm            # Edit and debug file
+    emu8086-tui tests/Requirement/bubble_sort.asm
 """)
 
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
-        print_help()
-        sys.exit(0)
-
     # Parse arguments
     args = sys.argv[1:]
     enable_gui = False
@@ -79,14 +95,9 @@ def main():
         elif not arg.startswith('-') and asm_file is None:
             asm_file = arg
 
+    # Neovim-style: If no file is specified, open an interactive untitled buffer
     if not asm_file:
-        print("Error: No assembly (.asm) file specified.")
-        print("Run 'python3 tui.py --help' for usage instructions.")
-        sys.exit(1)
-
-    if not os.path.exists(asm_file):
-        print(f"Error: File '{asm_file}' not found.")
-        sys.exit(1)
+        asm_file = "untitled.asm"
 
     tui = EmulatorTUI(asm_file, enable_gui_windows=enable_gui)
     tui.run()

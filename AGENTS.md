@@ -93,7 +93,13 @@ The emulator is written in Python (>=3.9) and models an Intel 8086 microprocesso
 | [`emulator/peripherals/video_display.py`](file:///home/sami/Documents/GitHub/8086-emulator/emulator/peripherals/video_display.py) | CGA 80x25 text buffer monitor (`0xB8000`) | `class VideoDisplayDevice` | ASCII character + color attribute byte pair decoding. |
 | [`ui/tui.py`](file:///home/sami/Documents/GitHub/8086-emulator/ui/tui.py) | Full-screen curses interactive debugger | `class EmulatorTUI` | Disassembly pane, Register diffs, Hardware telemetry, Hex/Stack viewer. |
 | [`ui/mainwindow.py`](file:///home/sami/Documents/GitHub/8086-emulator/ui/mainwindow.py) | PyQt5 main window controller | `class MainWindow` | Menu bar, peripheral launch actions, memory tables. |
-| [`pyproject.toml`](file:///home/sami/Documents/GitHub/8086-emulator/pyproject.toml) | Modern packaging configuration | Metadata & Entry points | Provides `pip install -e .`, `emu8086`, `emu8086-tui`. |
+| [`bin/emu8086-tui`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086-tui) | Standalone Linux TUI Launcher | Shell script | Zero-dependency terminal entry point (`readlink -f`). |
+| [`bin/emu8086-gui`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086-gui) | Standalone Linux GUI Launcher | Shell script | Desktop entry point with auto-detection for PyQt5 and NixOS. |
+| [`bin/emu8086`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086) | Unified CLI Launcher | Shell script | Auto-dispatches to headless CLI (`-n`) or modal TUI. |
+| [`install.sh`](file:///home/sami/Documents/GitHub/8086-emulator/install.sh) | Linux / NixOS Automated Installer | Shell script | Symlinks launchers into `~/.local/bin` and registers desktop apps. |
+| [`shell.nix`](file:///home/sami/Documents/GitHub/8086-emulator/shell.nix) | NixOS Development Environment | Nix expression | Provides Python 3 + PyQt5 environment with zero manual setup. |
+| [`desktop/*.desktop`](file:///home/sami/Documents/GitHub/8086-emulator/desktop/) | Freedesktop Application Entries | Desktop files | System launcher icons & `.asm` file associations. |
+| [`pyproject.toml`](file:///home/sami/Documents/GitHub/8086-emulator/pyproject.toml) | Modern packaging configuration | Metadata & Entry points | Provides `pip install -e .`, `emu8086`, `emu8086-tui`, `emu8086-gui`. |
 
 ---
 

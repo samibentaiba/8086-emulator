@@ -585,6 +585,91 @@ class TestTUIAdvancedScenarios(unittest.TestCase):
         tui.step()
         self.assertEqual(tui.EU.reg['AX'], 0x42)
 
+    def test_13_neovim_style_new_buffer_and_save(self):
+        """
+        Verify that opening EmulatorTUI without an existing file creates a new in-memory
+        buffer with standard MASM skeleton, exactly like Neovim, and can be saved to disk.
+        """
+        tui = EmulatorTUI(None, enable_gui_windows=False)
+        self.assertEqual(tui.filename, "untitled.asm")
+        self.assertIn("[New File]", tui.status_msg)
+        self.assertTrue(len(tui.source_lines) > 0)
+        self.assertIn("CODE SEGMENT", "\n".join(tui.source_lines))
+
+        # Test saving to a new file
+        target_path = os.path.join(tempfile.gettempdir(), "test_neovim_save.asm")
+        self.temp_files.append(target_path)
+        if os.path.exists(target_path):
+            os.remove(target_path)
+
+        tui.file_path = target_path
+        tui.save_source_file()
+
+        self.assertTrue(os.path.exists(target_path))
+        self.assertFalse(tui.modified)
+        self.assertIn("Saved", tui.status_msg)
+
+    def test_14_neovim_style_nonexistent_file_argument(self):
+        """
+        Verify that specifying a new file path (e.g. emu8086-tui my_new_prog.asm)
+        creates a ready-to-edit template buffer and saving persists it.
+        """
+        target_path = os.path.join(tempfile.gettempdir(), "brand_new_student_prog.asm")
+        self.temp_files.append(target_path)
+        if os.path.exists(target_path):
+            os.remove(target_path)
+
+        tui = EmulatorTUI(target_path, enable_gui_windows=False)
+        self.assertEqual(tui.file_path, target_path)
+        self.assertIn("[New File]", tui.status_msg)
+
+        # Enter insert mode and add an instruction
+        tui._handle_key(None, ord('i'))
+        tui.source_lines.insert(6, "    MOV BX, 01234H")
+        tui._handle_key(None, 27)  # Esc
+
+        # Save via Space + w
+        tui._handle_key(None, ord(' '))
+        tui._handle_key(None, ord('w'))
+
+        self.assertTrue(os.path.exists(target_path))
+        with open(target_path, 'r') as f:
+            content = f.read()
+        self.assertIn("MOV BX, 01234H", content)
+
+    def test_15_dual_app_launchers_and_installers_exist(self):
+        """
+        Verify all Windows and Linux launchers, desktop entries, and installer scripts exist.
+        """
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        expected_files = [
+            # Linux CLI launchers
+            "bin/emu8086",
+            "bin/emu8086-tui",
+            "bin/emu8086-gui",
+            # Linux Desktop entries
+            "desktop/emu8086-tui.desktop",
+            "desktop/emu8086-gui.desktop",
+            # Linux installer & Nix environment
+            "install.sh",
+            "shell.nix",
+            # Windows CLI launchers
+            "bin/windows/emu8086.bat",
+            "bin/windows/emu8086-tui.bat",
+            "bin/windows/emu8086-gui.bat",
+            "emu8086.bat",
+            "emu8086-tui.bat",
+            "emu8086-gui.bat",
+            # Windows installers
+            "install.bat",
+            "install.ps1",
+            # Standalone PyInstaller builder
+            "build_app.py",
+        ]
+        for rel in expected_files:
+            full_path = os.path.join(repo_root, rel)
+            self.assertTrue(os.path.exists(full_path), f"Expected launcher/installer missing: {rel}")
+
 
 if __name__ == '__main__':
     unittest.main()
