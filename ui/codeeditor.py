@@ -203,7 +203,7 @@ class AssemblyHighlighter(QSyntaxHighlighter):
             self.highlightingRules.append(rule)
 
         # braces
-        bracesPatterns = ['\{', '\}', '\(', '\)', '\[', '\]',]
+        bracesPatterns = [r'\{', r'\}', r'\(', r'\)', r'\[', r'\]']
         for pattern in bracesPatterns:
             rule = HighlightingRule()
             rule.pattern = QRegExp(r'%s' % pattern, Qt.CaseInsensitive)

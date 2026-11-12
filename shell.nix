@@ -11,11 +11,18 @@ pkgs.mkShell {
   buildInputs = [
     pythonEnv
     pkgs.desktop-file-utils
+    pkgs.libsForQt5.qtbase
+    pkgs.libsForQt5.qtwayland
   ];
 
   shellHook = ''
     export PYTHONPATH="$PWD:$PYTHONPATH"
     export PATH="$PWD/bin:$PATH"
+    export QT_PLUGIN_PATH="${pkgs.libsForQt5.qtbase.bin}/lib/qt-5.15.19/plugins:${pkgs.libsForQt5.qtwayland.bin}/lib/qt-5.15.19/plugins:$QT_PLUGIN_PATH"
+    export QT_QPA_PLATFORM_PLUGIN_PATH="${pkgs.libsForQt5.qtbase.bin}/lib/qt-5.15.19/plugins/platforms"
+    if [ -n "$WAYLAND_DISPLAY" ] && [ -z "$QT_QPA_PLATFORM" ]; then
+      export QT_QPA_PLATFORM="wayland;xcb"
+    fi
     echo "======================================================================"
     echo "  8086 Emulator NixOS Environment"
     echo "======================================================================"

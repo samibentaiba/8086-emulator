@@ -8,6 +8,22 @@ import os
 import sys
 
 def main():
+    # Automatically configure Qt platform plugins (xcb, wayland) on NixOS / Linux
+    if 'QT_PLUGIN_PATH' not in os.environ:
+        import glob
+        qt5_dirs = glob.glob('/nix/store/*-qtbase-*-bin/lib/qt-*/plugins') + \
+                   glob.glob('/nix/store/*-qtwayland-*-bin/lib/qt-*/plugins')
+        if qt5_dirs:
+            os.environ['QT_PLUGIN_PATH'] = ':'.join(qt5_dirs)
+            for d in qt5_dirs:
+                plat_dir = os.path.join(d, 'platforms')
+                if os.path.exists(plat_dir) and 'QT_QPA_PLATFORM_PLUGIN_PATH' not in os.environ:
+                    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plat_dir
+                    break
+
+    if 'QT_QPA_PLATFORM' not in os.environ and os.environ.get('WAYLAND_DISPLAY'):
+        os.environ['QT_QPA_PLATFORM'] = 'wayland;xcb'
+
     try:
         from PyQt5.QtWidgets import QApplication
         from ui.mainwindow import MainWindow
