@@ -65,6 +65,13 @@ if (-not $NoShortcuts) {
     Write-Host "[OK] Created Desktop Shortcut: $guiLnk" -ForegroundColor Green
 }
 
+# 4. Check & Install Dependencies
+$pipCmd = Get-Command pip -ErrorAction SilentlyContinue
+if ($pipCmd) {
+    Write-Host "Installing Windows dependencies (windows-curses and PyQt5)..." -ForegroundColor Yellow
+    & pip install windows-curses PyQt5
+}
+
 Write-Host "`n======================================================================" -ForegroundColor Cyan
 Write-Host "  Installation Complete!" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan

@@ -64,6 +64,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$s2.Save();" ^
   "Write-Host '[OK] Created shortcut:' $guiLnk;"
 
+REM 4. Check and install Windows dependencies (windows-curses and PyQt5)
+where pip >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    echo.
+    echo Checking Python dependencies for Windows...
+    python -c "import curses" >nul 2>nul
+    if %ERRORLEVEL% neq 0 (
+        echo Installing windows-curses for interactive terminal interface...
+        pip install windows-curses
+    ) else (
+        echo [OK] curses is ready.
+    )
+
+    python -c "import PyQt5" >nul 2>nul
+    if %ERRORLEVEL% neq 0 (
+        echo Installing PyQt5 for desktop graphical interface...
+        pip install PyQt5
+    ) else (
+        echo [OK] PyQt5 is ready.
+    )
+)
+
 echo.
 echo ======================================================================
 echo   Installation Complete!

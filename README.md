@@ -83,11 +83,27 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 
 ## Running the Emulator
 
-### Quick Install (Linux & NixOS)
-To install the standalone CLI commands into `~/.local/bin` and create desktop application entries:
+### Quick Install & Setup
+
+#### **Linux & NixOS**
+Run the automated installer script:
 ```bash
 ./install.sh
 ```
+* Installs `emu8086`, `emu8086-tui`, and `emu8086-gui` to `~/.local/bin/`.
+* Registers Desktop Applications and icons in your desktop launcher menu.
+* NixOS users can also run `nix-shell` inside the repository to load the environment automatically.
+
+#### **Windows**
+Run the automated Windows batch installer:
+```cmd
+install.bat
+```
+*(Or in PowerShell: `powershell -ExecutionPolicy Bypass -File .\install.ps1`)*
+* Adds `bin\windows` to your User `PATH`.
+* Automatically installs `windows-curses` and `PyQt5` via pip.
+* Creates Desktop shortcuts for **`8086 Emulator (TUI)`** and **`8086 Emulator (GUI)`**.
+* **Zero-install instant launch**: You can also simply double-click `emu8086-tui.bat` or `emu8086-gui.bat` directly in the repository folder!
 
 ### 1. Interactive Terminal User Interface (TUI)
 Launch the interactive full-screen debugger inside any standard terminal (including SSH, tmux, and Neovim terminal buffers) exactly like `nvim`:

@@ -8,6 +8,13 @@ set "SCRIPT_DIR=%~dp0"
 set "REPO_DIR=%SCRIPT_DIR%..\..\"
 set "PYTHONPATH=%REPO_DIR%;%PYTHONPATH%"
 
+REM Ensure PyQt5 is installed on Windows
+python -c "import PyQt5" >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo [8086 GUI] Installing 'PyQt5' for graphical workbench...
+    pip install PyQt5
+)
+
 REM Prefer pythonw if available for no-console windowed GUI, fallback to python
 where pythonw >nul 2>nul
 if %ERRORLEVEL% equ 0 (
