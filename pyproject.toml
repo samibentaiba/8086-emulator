@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "emu8086"
-version = "5.0.0"
+version = "5.2.0"
 description = "8086 Emulator with TUI debugger, virtual peripherals and EMU8086-compatible BIOS/DOS interrupts"
 readme = "README.md"
 license = { text = "MIT" }
