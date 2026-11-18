@@ -306,6 +306,9 @@ class CPU(object):
         # Print termination state
         self.EU.print("Clock ended\n")
         self.EU.print(f"CPU ran a total of {self.cycle_count} clock cycles\n")
+        self.close()
+
+    def close(self):
         if hasattr(self.EU, 'peripherals') and self.EU.peripherals:
             self.EU.peripherals.close_all()
         if hasattr(self.EU, 'video_display') and self.EU.video_display:

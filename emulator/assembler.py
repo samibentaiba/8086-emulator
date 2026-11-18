@@ -1,5 +1,4 @@
 import re
-import os
 import sys
 import ast
 from pprint import pprint
@@ -14,6 +13,7 @@ class AssemblyError(Exception):
         source   -- the original source text of the offending line
     """
     def __init__(self, message, line=None, source=None):
+        self.message = message
         self.line = line
         self.source = source
         loc = f" at line {line}" if line is not None else ""
@@ -22,6 +22,41 @@ class AssemblyError(Exception):
 
 
 data_def_ins = ['DB', 'DW', 'DD', 'DQ', 'DT', 'DUP']
+
+_QUOTED = r"""(?:'(?:\\.|''|[^'\\])*'|"(?:\\.|""|[^"\\])*")"""
+_TOKEN = re.compile(_QUOTED + r"""|;.*|[^'";,\s]+|['"]""")
+_DATA_VALUE = re.compile(_QUOTED + r"|(?<!\w)[0-9A-Fa-f]+[HhBbOoDd][,\s\]]+|\?")
+
+
+def _tokenize(line, line_number=None):
+    tokens = []
+    for match in _TOKEN.finditer(line):
+        token = match.group()
+        if token.startswith(';'):
+            line = line[:match.start()]
+            break
+        if token.startswith(("'", '"')):
+            if len(token) == 1:
+                raise AssemblyError("Unterminated quoted literal", line_number, line)
+            tokens.append(token)
+        else:
+            tokens.append(token.upper())
+    return tokens, line.strip()
+
+
+def _parse_data_values(string):
+    def normalize(match):
+        token = match.group()
+        if token == '?':
+            return '0'
+        if token.startswith(("'", '"')):
+            quote = token[0]
+            # MASM doubles the delimiter to include it inside a string.
+            return quote + token[1:-1].replace(quote * 2, '\\' + quote) + quote
+        return to_int_str(match)
+
+    return ast.literal_eval(_DATA_VALUE.sub(normalize, '[' + string + ']'))
+
 
 def to_int_str(matched):
     string = matched.group()
@@ -38,7 +73,7 @@ def to_decimal(num):
     if isinstance(num, int):
         return int(num)
     if (num.startswith("'") and num.endswith("'")) or (num.startswith('"') and num.endswith('"')):
-        inner = num[1:-1]
+        inner = num[1:-1].replace(num[0] * 2, num[0])
         if len(inner) == 1:
             return ord(inner)
     if num.startswith('0x'):
@@ -61,10 +96,13 @@ def to_decimal(num):
 class Assembler(object):
     # Assembler (Actually an Interpreter)
     def __init__(self, seg):
+        self.seg_adr = {reg: hex(seg[reg]) for reg in ('DS', 'CS', 'SS', 'ES')}
+        self._reset()
+
+    def _reset(self):
         self.name = ''
         self.title = ''
         self.space = {} # Segment space
-        self.seg_adr = {'DS': hex(seg['DS']), 'CS': hex(seg['CS']), 'SS': hex(seg['SS']), 'ES': hex(seg['ES'])}
         self.seg_id = {} # Segment name
         self.seg_len = {} # Segment actual length
         self.tags = {} # Labels
@@ -72,8 +110,11 @@ class Assembler(object):
         self.constants = {}  # EQU symbol table: name -> value string
         self.ip = '0'    # Program entry offset
         self.ins_origin = [] # Raw unparsed instructions
+        self._source_rows = []
+        self.ip_to_source_line = {}  # CS instruction offset -> original zero-based row
 
     def compile(self, code):
+        self._reset()
         instructions = self.__preprocessing(code)
         # Pre-scan ASSUME directives so segments defined before ASSUME are recognized
         for ins in instructions:
@@ -99,6 +140,10 @@ class Assembler(object):
                 self.ip = self.tags[ins[1]]['offset']
 
         self.__eval_id()
+        for offset, row in self.ip_to_source_line.items():
+            opcode = self.space['CS'][offset][0]
+            if opcode not in all_ins:
+                raise AssemblyError(f"Unknown instruction '{opcode}'", row + 1, self.ins_origin[self._source_rows.index(row)])
 
         # print()
         # for key, val in self.space.items():
@@ -125,9 +170,9 @@ class Assembler(object):
                     seg_name = k
             var_dict[key] = seg_name + ':[' + str(hex(int(val['offset'], 16))) + ']' # "segment:offset"
         # print("var_dict:", var_dict)
-        for key, val in self.space.items(): # Traverse each segment
-            for i in range(len(self.space[key])): # Traverse each line of code
-                ins = self.space[key][i]
+        for key, cells in self.space.items():
+            for i in range(self.seg_len[key]):
+                ins = cells[i]
                 if ins:
                     if ins[0] in transfer_control_ins and ins[-1] in self.tags.keys():
                         # jmp/call short/empty tag -> jmp/call tag.offset
@@ -145,13 +190,16 @@ class Assembler(object):
                             self.space[key][i][1] = self.tags[ins[1]]['offset']
                     j = 0
                     while j < len(ins):
-                        for s in ['SEG', 'OFFSET', 'TYPE']:
-                            if ins[j] == s:
-                                self.space[key][i].remove(s)
-                                if ins[j] in self.vars.keys():
-                                    self.space[key][i][j] = self.vars[ins[j]][s.lower()] 
-                                else:
-                                    self.space[key][i][j] = self.tags[ins[j]][s.lower()] 
+                        if ins[j] in ('SEG', 'OFFSET', 'TYPE'):
+                            operator = ins[j]
+                            name = ins[j + 1] if j + 1 < len(ins) else None
+                            symbol = self.vars.get(name) or self.tags.get(name)
+                            if symbol is None:
+                                row = self.ip_to_source_line.get(i) if key == 'CS' else None
+                                source = self.ins_origin[self._source_rows.index(row)] if row is not None else None
+                                raise AssemblyError(f"{operator} requires a defined label or variable",
+                                                    row + 1 if row is not None else None, source)
+                            ins[j:j + 2] = [str(symbol[operator.lower()])]
                         # Replace variables and labels
                         for k, v in var_dict.items():
                             if ins[j] == k:
@@ -169,45 +217,59 @@ class Assembler(object):
 
     def __segment(self, instructions, ip):
         seg_ip = 0  # Current segment offset, i.e., '$'
+        extent = 0  # A later ORG may move the location counter backwards.
         seg_ins = instructions[ip]
         seg_tmp = seg_ins[0]
         seg_name = self.seg_id[seg_tmp] # CS DS SS ES
         self.space[seg_name] = [['0']] * int('10000', 16)
+        if seg_name == 'CS':
+            self.ip_to_source_line.clear()
         for i in range(ip+1, len(instructions)):
             ins = instructions[i]
             for j in range(len(ins)):
                 if ins[j] == '$':
                     ins[j] = str(hex(seg_ip))
             ins_ori = self.ins_origin[i]
+            if ':' in ins[0]:
+                tag, following = ins[0].split(':', 1)
+                self.tags[tag] = {'seg': self.seg_adr[seg_name],
+                                  'offset': hex(seg_ip),
+                                  'type': 0}
+                ins = ([following] if following else []) + ins[1:]
+                ins_ori = ins_ori.split(':', 1)[1].lstrip()
+                if not ins:
+                    continue
             if ins[0] == 'ORG':
-                seg_ip = to_decimal(ins[1])
+                extent = max(extent, seg_ip)
+                try:
+                    seg_ip = to_decimal(ins[1])
+                except (ValueError, IndexError):
+                    seg_ip = -1
+                if len(ins) != 2 or not 0 <= seg_ip < 0x10000:
+                    raise AssemblyError("ORG requires a 16-bit offset", self._source_rows[i] + 1, self.ins_origin[i])
             elif ins[0] == 'EVEN': # Align next memory variable to even address
                 seg_ip += seg_ip % 2
             elif ins[0] == 'ALIGN':
-                num = to_decimal(ins[1])
-                assert num & (num-1) == 0, "Num should be power of 2"  # num is power of 2
-                seg_ip += (-seg_ip) % num 
-            elif ins[0] == seg_tmp:
-                if ins[1] != 'ENDS':
-                    raise AssemblyError(f"Expected 'ENDS' to close segment '{seg_tmp}', got '{ins[1]}'", line=i+1)
-                self.seg_len[seg_name] = seg_ip
+                try:
+                    num = to_decimal(ins[1])
+                except (ValueError, IndexError):
+                    num = 0
+                if len(ins) != 2 or num <= 0 or num & (num - 1):
+                    raise AssemblyError("ALIGN requires a positive power of two",
+                                        self._source_rows[i] + 1, self.ins_origin[i])
+                seg_ip += (-seg_ip) % num
+                if seg_ip > 0x10000:
+                    raise AssemblyError("Alignment exceeds segment size", self._source_rows[i] + 1, self.ins_origin[i])
+            elif ins[0] == seg_tmp or ins == ['ENDS']:
+                if ins[0] == seg_tmp and ins[1:] != ['ENDS']:
+                    raise AssemblyError(f"Expected 'ENDS' to close segment '{seg_tmp}'",
+                                        line=self._source_rows[i] + 1, source=ins_ori)
+                self.seg_len[seg_name] = max(extent, seg_ip)
                 return i + 1
 
-            elif ':' in ins[0]: # Data label
-                tag_list = ins[0].split(':')
-                tag = tag_list[0]
-                self.tags[tag] = {'seg': self.seg_adr[seg_name],
-                                  'offset': hex(seg_ip),
-                                  'type': 0} # TODO(Zubin) set type
-                if len(ins) == 1:                   # case1: start:\n mov ...
-                    pass
-                else:
-                    if tag_list[1]:                 # case2: start:mov ...
-                        ins[0] = tag_list[1] # Strip label
-                    else:                           # case3: start: mov ... 
-                        ins = ins[1:] # Strip label
-                    self.space[seg_name][seg_ip] = ins
-                    seg_ip += 1
+            elif ins[0] == 'END' or ins[1:2] in (['SEGMENT'], ['ENDS']):
+                raise AssemblyError(f"Expected '{seg_tmp} ENDS' before '{ins_ori}'",
+                                    line=self._source_rows[i] + 1, source=ins_ori)
             
             elif ins[0] == 'ASSUME':
                 self.__assume(ins[1:])
@@ -233,22 +295,35 @@ class Assembler(object):
                 # ENDP — marks end of procedure definition, no code generated
                 pass
 
-            elif ins[0] in data_def_ins: # Data definition pseudo-instruction
-                byte_list = self.__data_define(ins, ins_ori)
+            elif ins[0] in data_def_ins or (len(ins) > 2 and ins[1] in data_def_ins):
+                if ins[0] not in data_def_ins:
+                    self.vars[ins[0]] = {'seg': self.seg_adr[seg_name],
+                                         'offset': hex(seg_ip), 'type': 0}
+                    ins = ins[1:]
+                    ins_ori = ins_ori.split(None, 1)[1]
+                try:
+                    byte_list = self.__data_define(ins, ins_ori)
+                except (ValueError, SyntaxError, AssemblyError) as err:
+                    message = err.message if isinstance(err, AssemblyError) else f"Invalid {ins[0]} initializer"
+                    raise AssemblyError(message, self._source_rows[i] + 1, self.ins_origin[i]) from err
+                if seg_ip + len(byte_list) > 0x10000:
+                    raise AssemblyError("Data exceeds segment size", self._source_rows[i] + 1, self.ins_origin[i])
                 self.space[seg_name][seg_ip:seg_ip+len(byte_list)] = byte_list
+                if seg_name == 'CS':
+                    # ORG can place data over an earlier instruction.
+                    for offset in range(seg_ip, seg_ip + len(byte_list)):
+                        self.ip_to_source_line.pop(offset, None)
                 seg_ip += len(byte_list)
-            elif len(ins) > 2 and ins[1] in data_def_ins:
-                var = ins[0]
-                self.vars[var] = {'seg': self.seg_adr[seg_name],
-                                  'offset': hex(seg_ip),
-                                  'type': 0}      # TODO(Zubin) set type
-                var_ori = ins_ori.split()[0] # Actual variable name (preserve case)
-                byte_list = self.__data_define(ins[1:], ins_ori.replace(var_ori, '', 1).strip())
-                self.space[seg_name][seg_ip:seg_ip+len(byte_list)] = byte_list
-                seg_ip += len(byte_list)
-            else: # Assembly instruction without data label; emit directly to segment space
+            else: # Emit an instruction at the current segment offset
+                if seg_ip >= 0x10000:
+                    raise AssemblyError("Instruction exceeds segment size", self._source_rows[i] + 1, self.ins_origin[i])
                 self.space[seg_name][seg_ip] = ins
+                if seg_name == 'CS':
+                    self.ip_to_source_line[seg_ip] = self._source_rows[i]
                 seg_ip += 1
+
+        raise AssemblyError(f"Missing '{seg_tmp} ENDS' for segment opened here",
+                            line=self._source_rows[ip] + 1, source=self.ins_origin[ip])
 
     def __data_define(self, ins, ins_ori):
         var = ins[0]
@@ -259,7 +334,7 @@ class Assembler(object):
             times = to_decimal(ins[1])
             idx = ins_ori.find('(')
             dup_str = var + ' ' + ins_ori[idx + 1:-1]
-            dup_list = [s for s in re.split(" |,", dup_str.strip().upper()) if s]
+            dup_list, _ = _tokenize(dup_str)
             byte_list = self.__data_define(dup_list, dup_str) * times
 
         elif var == 'DB': # DB　’A’, ‘D’, 0Dh, ‘$’   DB　1, 3, 5, 7, 9, 11
@@ -282,8 +357,7 @@ class Assembler(object):
 
     @classmethod
     def __str_to_bytes(cls, string):
-        string = re.sub(r"[0-9A-Fa-f]+[HhBbOo]{1}[,\s\]]+", to_int_str, '[' + string + ']')
-        str_list =  ast.literal_eval(string)
+        str_list = _parse_data_values(string)
         byte_list = []
         for item in str_list:
             if isinstance(item, int):
@@ -297,8 +371,7 @@ class Assembler(object):
 
     @classmethod
     def __str_to_words(cls, string):
-        string = re.sub(r"[0-9A-Fa-f]+[HhBbOo]{1}[,\s\]]+", to_int_str, '[' + string + ']')
-        str_list =  ast.literal_eval(string)
+        str_list = _parse_data_values(string)
         byte_list = []
         for item in str_list:
             if not isinstance(item, int):
@@ -310,8 +383,7 @@ class Assembler(object):
 
     @classmethod
     def __str_to_dwords(cls, string):
-        string = re.sub(r"[0-9A-F]+[HhBbOo]{1}[,\s\]]+", to_int_str, '[' + string + ']')
-        str_list =  ast.literal_eval(string)
+        str_list = _parse_data_values(string)
         byte_list = []
         for item in str_list:
             if not isinstance(item, int):
@@ -327,20 +399,14 @@ class Assembler(object):
             i = i.split(':')
             self.seg_id[i[1]] = i[0]
 
-    def __strip_comments(self, text):
-        return re.sub(r'(?m) *;.*n?', '', str(text))
-
-    def __remove_empty_line(self, text):
-        return os.linesep.join([s.strip() for s in text.splitlines() if s.strip()])
-
     def __preprocessing(self, code):
-        code = self.__strip_comments(code)
-        code = self.__remove_empty_line(code)
-        code = code.replace('?', '0')
         instructions = []
-        for line in code.split(os.linesep):
-            instructions.append([s for s in re.split(" |,", line.strip().upper()) if s])
-            self.ins_origin.append(line.strip())
+        for row, line in enumerate(code.splitlines()):
+            tokens, source = _tokenize(line, row + 1)
+            if tokens:
+                instructions.append(tokens)
+                self.ins_origin.append(source)
+                self._source_rows.append(row)
         # for i in range(len(instructions)):
         #     print(instructions[i])
         # print()

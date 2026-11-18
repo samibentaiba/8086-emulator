@@ -12,7 +12,8 @@ REM Ensure PyQt5 is installed on Windows
 python -c "import PyQt5" >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo [8086 GUI] Installing 'PyQt5' for graphical workbench...
-    pip install PyQt5
+    python -m pip install PyQt5
+    if errorlevel 1 exit /b 1
 )
 
 REM Prefer pythonw if available for no-console windowed GUI, fallback to python

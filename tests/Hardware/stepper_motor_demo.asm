@@ -6,7 +6,9 @@ CODE SEGMENT
 ASSUME CS:CODE
 
 START:
-    MOV CX, 32          ; 32 half-steps = 1 full revolution
+    MOV AL, 02h         ; Establish the starting coil phase
+    OUT 7, AL
+    MOV CX, 8           ; Four transitions per loop, 32 per revolution
 
 STEP_LOOP:
     ; Wait for ready bit (bit 7 of Port 7 IN)

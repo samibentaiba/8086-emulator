@@ -380,8 +380,8 @@ class VideoDisplayDevice(object):
 
 if __name__ == '__main__':
     print("Testing Video Display Device (0xB8000 Text Mode)...")
-    from emulator.memory import Memory
-    mem = Memory(0xFFFFF, 0x10000)
+    from emulator.memory import MEMORY_SIZE, Memory
+    mem = Memory(MEMORY_SIZE, 0x10000)
     dev = VideoDisplayDevice(memory=mem, enable_gui=True)
     time.sleep(0.5)
 

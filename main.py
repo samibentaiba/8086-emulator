@@ -2,13 +2,13 @@ import os
 import sys
 import argparse
 from emulator.assembler import Assembler
-from emulator.memory import Memory
+from emulator.memory import MEMORY_SIZE, Memory
+from emulator.peripherals import PeripheralManager
 from emulator.pipeline_units import bus_interface_unit, execution_unit
 from emulator.cpu import CPU
 
 
 INSTRUCTION_QUEUE_SIZE = 6
-MEMORY_SIZE = int('FFFFF', 16)  # Memory address space size 1MB
 CACHE_SIZE = int('10000', 16)  # Cache size 64KB
 SEGMENT_SIZE = int('10000', 16) # Maximum segment size 64KB (10000H)
 
@@ -64,6 +64,8 @@ def main():
     memory.load(exe_file) # load code segment
 
     BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, exe_file, memory)
+    PeripheralManager.reset_instance()
+    PeripheralManager.get_instance(enable_gui=args.gui_windows)
     EU = execution_unit.execution_unit(BIU, args.interrupt)
     cpu = CPU(BIU, EU, gui_mode=False)
     print("\nCPU initialized successfully.")

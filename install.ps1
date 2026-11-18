@@ -1,6 +1,6 @@
 ﻿# ==============================================================================
 # 8086 Emulator — Windows PowerShell Automated Installer
-# Configures User PATH and creates Desktop & Start Menu Shortcuts
+# Configures User PATH and creates Desktop shortcuts
 # ==============================================================================
 
 [CmdletBinding()]
@@ -18,18 +18,22 @@ Write-Host "  Installing 8086 Emulator for Windows (TUI & GUI Applications)" -Fo
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "Repository root: $RepoDir"
 
-# 1. Check Python
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+# Install both frontends with the Python interpreter the launchers will use.
+$pythonCmd = Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $pythonCmd) {
-    Write-Warning "Python 3 was not found in PATH. Please install Python 3.9+ from https://python.org"
-} else {
-    Write-Host "[OK] Detected Python: $(& python --version 2>&1)" -ForegroundColor Green
+    throw "Install Python 3.9 or later and add it to PATH, then run the installer again."
 }
+$pythonExe = $pythonCmd.Source
+& $pythonExe -c "import sys; print(sys.version.split()[0]); sys.exit(sys.version_info < (3, 9))"
+if ($LASTEXITCODE -ne 0) { throw "The Windows launchers require Python 3.9 or later." }
+Write-Host "Installing Windows frontend dependencies with $pythonExe" -ForegroundColor Cyan
+& $pythonExe -m pip install -r (Join-Path $RepoDir "requirements.txt")
+if ($LASTEXITCODE -ne 0) { throw "Installing the Windows frontend dependencies failed." }
 
 # 2. Add to User PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not $UserPath) { $UserPath = "" }
-$paths = $UserPath -split ";" | Where-Object { $_ -ne "" }
+$paths = @($UserPath -split ";" | Where-Object { $_ -ne "" })
 
 if ($paths -notcontains $BinDir) {
     $NewPath = ($paths + $BinDir) -join ";"
@@ -63,13 +67,6 @@ if (-not $NoShortcuts) {
     $s2.Description = "8086 Emulator - PyQt5 Desktop GUI Workbench"
     $s2.Save()
     Write-Host "[OK] Created Desktop Shortcut: $guiLnk" -ForegroundColor Green
-}
-
-# 4. Check & Install Dependencies
-$pipCmd = Get-Command pip -ErrorAction SilentlyContinue
-if ($pipCmd) {
-    Write-Host "Installing Windows dependencies (windows-curses and PyQt5)..." -ForegroundColor Yellow
-    & pip install windows-curses PyQt5
 }
 
 Write-Host "`n======================================================================" -ForegroundColor Cyan

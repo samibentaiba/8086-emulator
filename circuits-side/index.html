@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0d554a" />
+    <title>Circuit Atlas — 8086 Workbench</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="appbar">
+      <a href="#workbench" class="brand" aria-label="Circuit Atlas home"
+        ><svg viewBox="0 0 36 36" aria-hidden="true">
+          <rect width="36" height="36" rx="8" fill="#12684f" />
+          <g
+            fill="none"
+            stroke="white"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7 13h7l3-5h9M7 18h11l4-5h7M7 23h8l4 5h8" />
+            <circle cx="7" cy="13" r="1.5" />
+            <circle cx="29" cy="13" r="1.5" />
+            <circle cx="27" cy="28" r="1.5" />
+          </g></svg
+        ><span>Circuit Atlas</span></a
+      >
+      <span class="appdiv"></span><span class="appname">Logic workbench</span>
+      <nav class="modes" aria-label="Learning mode">
+        <button id="explore" aria-pressed="true">
+          <i data-icon="compass"></i>Explore</button
+        ><button id="revise" aria-pressed="false">
+          <i data-icon="cards"></i>Revise
+        </button>
+      </nav>
+      <button id="programToggle" class="guide" aria-expanded="false">Write code</button><button id="guide" class="guide">
+        <i data-icon="help"></i><span>Quick guide</span>
+      </button>
+    </header>
+    <main id="workbench">
+      <div class="pagehead">
+        <div>
+          <div class="eyebrow">
+            <span class="tiny-chip">86</span> PROCESSOR LAB
+          </div>
+          <h1>8086 circuit explorer</h1>
+          <label class="trace-select" for="traceProgram"
+            >Instruction
+            <select id="traceProgram">
+              <option value="ADD">01 D8 · ADD AX, BX</option>
+              <option value="SUB">29 D8 · SUB AX, BX</option>
+              <option value="MEM">26 03 42 06 · ADD AX, ES:[BP+SI+6]</option>
+            </select></label
+          >
+        </div>
+        <div class="transport">
+          <span class="status" id="status">Paused</span
+          ><button id="step" class="button"><i data-icon="step"></i>Step</button
+          ><button id="instructionStep" class="button" hidden>Instruction</button><button id="run" class="button primary">
+            <i data-icon="play"></i><span>Run clock</span>
+          </button>
+        </div>
+      </div>
+      <div class="workspace">
+        <section class="board panel" aria-label="Interactive CPU circuit">
+          <header class="panelbar">
+            <div class="paneltitle">
+              <i data-icon="circuit"></i>
+              <h2>Schematic</h2>
+            </div>
+            <div class="boardactions">
+              <button class="smallbtn" id="find" aria-expanded="false">
+                <i data-icon="list"></i><span>Components</span
+                ><i data-icon="chev"></i></button
+              ><button
+                class="iconbtn"
+                id="expand"
+                title="Expand schematic"
+                aria-label="Expand schematic"
+              >
+                <i data-icon="expand"></i>
+              </button>
+            </div>
+          </header>
+          <div class="surface">
+            <div class="canvasbar">
+              <div class="crumb">
+                <button id="home">CPU</button><span id="crumbpart"></span>
+              </div>
+              <span class="level" id="level">Architecture</span>
+            </div>
+            <div
+              id="canvas"
+              tabindex="0"
+              role="group"
+              aria-label="CPU diagram. Scroll to zoom, drag to pan, or use the component menu."
+            >
+              <svg
+                id="map"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-label="Connected EU, BIU and CU processor schematic"
+              >
+                <defs>
+                  <pattern
+                    id="dots"
+                    width="14"
+                    height="14"
+                    patternUnits="userSpaceOnUse"
+                  >
+                    <circle cx="1" cy="1" r="0.7" fill="#c9cec6" />
+                  </pattern>
+                </defs>
+                <g id="world"></g>
+              </svg>
+            </div>
+            <div class="canvasfoot">
+              <div class="zoomtools">
+                <button id="minus" aria-label="Zoom out" title="Zoom out">
+                  −</button
+                ><output id="zoom">100%</output
+                ><button id="plus" aria-label="Zoom in" title="Zoom in">
+                  +</button
+                ><b></b
+                ><button
+                  id="fit"
+                  aria-label="Fit entire CPU"
+                  title="Fit entire CPU"
+                >
+                  <i data-icon="fit"></i>
+                </button>
+              </div>
+              <div class="minimap" title="Click to navigate" aria-hidden="true">
+                <svg viewBox="0 0 1232 744">
+                  <rect
+                    class="miniunit"
+                    x="26"
+                    y="36"
+                    width="568"
+                    height="352"
+                  />
+                  <rect
+                    class="miniunit"
+                    x="638"
+                    y="36"
+                    width="563"
+                    height="352"
+                  />
+                  <rect
+                    class="miniunit"
+                    x="26"
+                    y="427"
+                    width="1175"
+                    height="290"
+                  />
+                  <g id="mininodes"></g>
+                  <rect
+                    id="miniview"
+                    fill="#438d7120"
+                    stroke="#16724d"
+                    stroke-width="13"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div id="components" hidden></div>
+          </div>
+          <div class="edge-readout">
+            <div>
+              <b id="edgeLastLabel">Last edge</b><span id="edgeLast"></span>
+            </div>
+            <div>
+              <b id="edgeNextLabel">Next edge</b><span id="edgeNext"></span>
+            </div>
+          </div>
+          <footer class="boardlegend">
+            <span><b class="sw data"></b>Data</span
+            ><span><b class="sw addr"></b>Address</span
+            ><span><b class="sw control"></b>Control</span
+            ><span class="teaching-key"
+              ><b class="sw teaching"></b>Learning control</span
+            ><span class="gesture"
+              ><i data-icon="mouse"></i>Scroll to zoom · Drag to pan</span
+            >
+          </footer>
+        </section>
+        <aside class="panel inspector">
+          <header class="panelbar">
+            <div class="paneltitle">
+              <i data-icon="inspect"></i>
+              <h2 id="inspectorTitle">Inspector</h2>
+            </div>
+            <span class="live"><i></i>LINKED</span>
+          </header>
+          <div id="inspectorBody"></div>
+        </aside>
+      </div>
+      <section id="programDock" class="program-dock panel" hidden aria-label="Assembly program and execution">
+      <div class="program-head">
+        <div class="paneltitle"><h2>Assembly program</h2><span id="programState" role="status">Ready to assemble</span></div>
+        <div class="program-actions">
+          <select id="sampleProgram" aria-label="Assembly example"><option value="sum">Sum with a loop</option><option value="memory">ES memory addressing</option><option value="call">Stack and a procedure</option><option value="sort">Your bubble sort</option></select>
+          <label class="file-button">Open .asm<input id="openAssembly" type="file" accept=".asm,.s,.txt" hidden></label>
+          <button id="assembleProgram" class="button primary">Assemble &amp; load</button>
+          <button id="backProgram" class="button" disabled>Back instruction</button>
+          <button id="saveAssembly" class="button">Save .asm</button>
+        </div>
+      </div>
+      <div class="program-grid">
+        <div class="source-editor"><label for="assemblySource">8086 assembly · MASM segments or a short instruction list</label><textarea id="assemblySource" spellcheck="false" aria-describedby="assemblyError"></textarea><output id="assemblyError" role="alert"></output></div>
+        <div class="listing-pane"><div class="smallheading">Encoded bytes <span id="programCounter"></span></div><div id="programListing" role="list" aria-label="Assembly listing"></div></div>
+        <div class="machine-pane"><div class="machine-tabs"><button id="showRegisters" aria-pressed="true">Registers</button><button id="showMemory" aria-pressed="false">Memory</button><button id="showConsole" aria-pressed="false">Console</button></div><div id="machineContents"></div></div>
+      </div>
+      <details class="program-scope"><summary>Instruction support and accuracy</summary><p>Assembly is encoded into 8086 bytes. The Python execution unit from your emulator supplies register, memory and flag effects. The queue holds six bytes and taken branches flush it. Highlighted transfers are an instructional trace. Microcode ROM contents, concurrent bus scheduling, external interrupts and transistor timing require a further hardware model.</p><p id="supportedInstructions"></p><p>INT 21h implements exit, character output and string output. Code changes require reassembly. The diagram’s counter and matrix visualize trace playback, and the ALU uses equivalent logic gates.</p><a href="python/LICENSE-emulator.txt" target="_blank">Emulator source · MIT license</a></details>
+    </section>
+    <section class="timing panel">
+        <div class="clockmeta">
+          <div class="paneltitle">
+            <i data-icon="wave"></i>
+            <h2>Clock &amp; timing</h2>
+          </div>
+          <div class="frequency">
+            <label for="freq">Frequency</label
+            ><select id="freq" aria-label="Clock frequency">
+              <option value=".5">0.5 Hz</option>
+              <option selected value="1">1 Hz</option>
+              <option value="2">2 Hz</option>
+              <option value="4">4 Hz</option>
+              <option value="8">8 Hz</option>
+            </select>
+          </div>
+        </div>
+        <div class="scope">
+          <div class="scopeheading">
+            <span
+              ><b class="sw clock"></b>CLK <b class="sw control"></b>AX write
+              enable</span
+            ><span id="period">Period 1 s</span>
+          </div>
+          <svg
+            id="wave"
+            viewBox="0 0 660 50"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Clock and AX write enable timing traces"
+          ></svg>
+        </div>
+        <div class="cycle">
+          <span class="label">LEARNING EDGE</span
+          ><strong id="cycles">000</strong
+          ><small id="phaseName">Fetch word</small>
+        </div>
+        <button
+          class="iconbtn reset"
+          id="reset"
+          title="Reset simulation"
+          aria-label="Reset simulation"
+        >
+          <i data-icon="reset"></i>
+        </button>
+      </section>
+    </main>
+    <dialog id="help">
+      <div class="dialoghead">
+        <h2>Quick guide</h2>
+        <button class="iconbtn" id="closeHelp" aria-label="Close guide">
+          ×
+        </button>
+      </div>
+      <div id="helptext"></div>
+      <button class="button primary" id="startLab">Return to workbench</button>
+    </dialog>
+    <script src="model.js"></script>
+    <script src="program.js"></script><script src="diagram.js"></script>
+    <script src="sheet.js"></script>
+    <script src="architecture.js"></script>
+    <script src="app.js"></script><script src="program-ui.js"></script>
+  </body>
+</html>

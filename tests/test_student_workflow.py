@@ -297,8 +297,7 @@ class TestStudentLearningWorkflow(unittest.TestCase):
         # Check that Traffic Lights device on Port 4 is active
         tl_dev = tui_tl.EU.peripherals.get_device(4)
         self.assertIsNotNone(tl_dev)
-        # Port 4 state should be non-zero after phase 1 write
-        self.assertGreater(tl_dev.state, 0)
+        self.assertEqual(tl_dev.state, 0x030C)  # N/S green, E/W red
 
     def test_17_student_tests_stepper_motor_hardware_demo(self):
         """Student tests the Port 7 Stepper Motor hardware demo in the TUI."""
@@ -306,7 +305,7 @@ class TestStudentLearningWorkflow(unittest.TestCase):
         self.assertIsNotNone(tui_sm.cpu)
 
         # Run demo
-        for _ in range(50):
+        for _ in range(200):
             if tui_sm.cpu.check_done():
                 break
             tui_sm.step()
@@ -314,9 +313,10 @@ class TestStudentLearningWorkflow(unittest.TestCase):
         # Check Stepper Motor on Port 7
         sm_dev = tui_sm.EU.peripherals.get_device(7)
         self.assertIsNotNone(sm_dev)
-        # Motor should have rotated and registered steps
-        self.assertGreater(sm_dev.step_count, 0)
-        self.assertGreater(sm_dev.angle, 0.0)
+        self.assertTrue(tui_sm.cpu.check_done())
+        self.assertEqual(sm_dev.step_count, 32)
+        self.assertEqual(sm_dev.angle, 0.0)
+        self.assertEqual(sm_dev.state, 0)  # Coils released after the turn
 
 
 if __name__ == "__main__":

@@ -37,17 +37,22 @@ code segment
            
            mov al,num1         
            sub al,num2         ;sub num2 from num1
-           mov res,al          ;store sum in res
-           mov ah,0            ;clear garabage value (ah to be used later)
-           aaa                 ;converts hex to bcd and stores values in ah and al 
-           add ah,30h          ;first digit converted into bcd
-           add al,30h          ;second digit converted from ascii to bcd
-           
-           mov bx,ax           ;save value of ax into bx
+           mov res,al          ;save signed difference while displaying the prompt
            lea dx,msg3         ;print ms3
            mov ah,9h
            int 21h
            
+           mov al,res
+           cmp al,0
+           jge magnitude
+           mov dl,'-'
+           mov ah,2h
+           int 21h
+           mov al,res
+           neg al
+magnitude: aam                 ;split magnitude into decimal tens and units
+           add ax,3030h        ;convert both digits to ASCII
+           mov bx,ax
            mov ah,2h           ;print first digit
            mov dl,bh                                
            int 21h

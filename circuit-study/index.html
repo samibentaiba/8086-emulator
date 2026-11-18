@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#15362f"><title>Logic Atlas · Circuit workbench</title>
+<link rel="icon" href="atlas.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="notebook.css">
+<script defer src="circuits.js"></script><script defer src="notebook.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+<header class="mast"><a class="brand" href="#boolean"><img src="atlas.svg" alt="">Logic Atlas</a><span class="mast-label">Digital logic workbench</span><div class="mast-actions"><button id="jump-practice"><i data-icon="cards"></i>Practice</button><button id="help-open" aria-label="Keyboard shortcuts" title="Keyboard shortcuts"><i data-icon="keyboard"></i></button></div></header>
+<div class="shell">
+<aside class="sidebar">
+<div class="section-label">Circuit library</div><nav id="library" aria-label="Circuit library"></nav>
+<section class="zoom-guide"><div class="side-title"><i data-icon="layers"></i> Zoom levels</div><p>Zoom in to reveal the logic behind each circuit.</p><div id="levels"></div></section>
+<section class="key"><div class="section-label">Signal key</div><span><b class="key-line high"></b>High <em>1</em></span><span><b class="key-line low"></b>Low <em>0</em></span></section>
+</aside>
+<main>
+<div class="crumb"><i data-icon="library"></i> Circuit library <span>/</span> <strong id="topic"></strong></div>
+<div class="page-heading"><div><h1 id="title">Boolean gate network</h1><p id="subtitle">Trace three inputs through an AND–OR network to find the output.</p></div>
+<div class="pager"><button id="previous" title="Previous circuit" aria-label="Previous circuit"><i data-icon="left"></i></button><span id="position">1 / 4</span><button id="next" title="Next circuit" aria-label="Next circuit"><i data-icon="right"></i></button></div></div>
+<div class="workbench">
+<section class="diagram-panel panel" aria-label="Interactive circuit schematic">
+<div class="panel-title"><h2><i data-icon="network"></i> Circuit schematic</h2><span class="live"><b></b> Live</span></div>
+<div id="canvas" tabindex="0" aria-label="Circuit canvas. Scroll to zoom, drag to pan, or use the zoom controls.">
+<div class="canvas-badge"><span class="crossmark">⌖</span> <span id="figure">FIG. 01</span></div>
+<svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Interactive logic gate diagram" viewBox="0 0 800 390"></svg>
+<div class="canvas-tools"><button id="minus" aria-label="Zoom out" title="Zoom out"><i data-icon="minus"></i></button><output id="zoom-num" aria-label="Zoom">100%</output><button id="plus" aria-label="Zoom in" title="Zoom in"><i data-icon="plus"></i></button><button id="fit" aria-label="Fit circuit to view" title="Fit circuit to view"><i data-icon="fit"></i></button></div>
+</div>
+<div class="canvas-foot"><span><i data-icon="layers"></i><span id="level-name">Gate view</span></span><small>Scroll to zoom <b>·</b> Drag to pan</small></div>
+</section>
+<aside class="panel inspector" aria-label="Signal inspector"><div class="panel-title"><h2><i data-icon="sliders"></i>Signal inspector</h2><button id="reset" class="icon-btn" aria-label="Reset this circuit" title="Reset this circuit"><i data-icon="reset"></i></button></div><div id="signals"></div></aside>
+</div>
+<section class="notebook"><div class="tabbar" role="tablist" aria-label="Learning tools" id="tabs"></div><div id="notes" role="tabpanel" tabindex="0"></div></section>
+</main></div>
+<dialog id="shortcuts"><div class="dialog-head"><h2>Keyboard shortcuts</h2><button aria-label="Close shortcuts" id="help-close">×</button></div><dl><dt>Zoom in / out</dt><dd><kbd>+</kbd> <kbd>−</kbd></dd><dt>Fit schematic</dt><dd><kbd>0</kbd></dd><dt>Pan focused canvas</dt><dd><kbd>↑ ↓ ← →</kbd></dd><dt>Close shortcuts</dt><dd><kbd>Esc</kbd></dd></dl></dialog>
+<noscript>Enable JavaScript to explore the circuits.</noscript>
+</body></html>

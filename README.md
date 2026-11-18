@@ -85,14 +85,31 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 
 ### Quick Install & Setup
 
-#### **Linux & NixOS**
-Run the automated installer script:
+#### Debian and Ubuntu
+
+The command-line emulator and terminal debugger use Python 3.9 or newer and the standard library. On a minimal Debian or Ubuntu install, install Python first. Add PyQt5 for the desktop debugger and Tk for the optional peripheral windows.
+
+```bash
+sudo apt install python3
+sudo apt install python3-pyqt5 python3-tk  # Optional graphical interfaces
+```
+
+From the repository directory, install the launchers for your user and try the bundled bubble sort program.
+
 ```bash
 ./install.sh
+export PATH="$HOME/.local/bin:$PATH"
+emu8086 tests/Requirement/bubble_sort.asm -n
+emu8086-tui tests/Requirement/bubble_sort.asm
 ```
-* Installs `emu8086`, `emu8086-tui`, and `emu8086-gui` to `~/.local/bin/`.
-* Registers Desktop Applications and icons in your desktop launcher menu.
-* NixOS users can also run `nix-shell` inside the repository to load the environment automatically.
+
+Press `s` to step, `u` to rewind, and `q` to quit the TUI. Run `emu8086-gui` in a graphical session to open the desktop debugger. The installer adds menu entries and links the three commands in `~/.local/bin` to this checkout. Keep the checkout in place or rerun `./install.sh` after moving it.
+
+Installation and execution were verified on Debian 13 and Ubuntu 24.04.5. Both passed all 109 tests, the shell launcher and Python package installations, and interactive TUI stepping, rewind, and quit. The installed GUI was rendered offscreen on both systems. A full graphical desktop session remains untested.
+
+#### NixOS
+
+Run `nix-shell` in the repository to load Python and the desktop dependencies from `shell.nix`. Run `./install.sh` to add the same launchers and desktop entries.
 
 #### **Windows**
 Run the automated Windows batch installer:
@@ -757,10 +774,11 @@ The built-in assembler compiles standard MASM assembly files using the Small mem
 
 ## Automated Test Suite
 
-Run the full automated test suite (including unit tests for virtual peripherals, interrupts, and TUI):
+From a Python virtual environment, install the frontend dependencies and run the tests. The requirements file includes PyQt5 for the desktop tests and installs curses on Windows.
 
 ```bash
-python3 -m unittest discover tests
+python -m pip install -r requirements.txt
+python -m unittest discover tests
 ```
 
 ### Sample Assembly Programs

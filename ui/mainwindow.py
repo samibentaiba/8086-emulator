@@ -3,7 +3,7 @@ import os
 import time
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import QThread, QTimer, pyqtSignal, QObject
+from PyQt5.QtCore import QIODevice, QSaveFile, QThread, QTimer, pyqtSignal, QObject
 from PyQt5 import uic
 
 from ui.codeeditor import CodeEditor, AssemblyHighlighter
@@ -13,13 +13,12 @@ import re
 import sys
 import queue
 from emulator.assembler import Assembler
-from emulator.memory import Memory
+from emulator.memory import MEMORY_SIZE, Memory
 from emulator.pipeline_units import bus_interface_unit, execution_unit
 from emulator.cpu import CPU
 
 
 INSTRUCTION_QUEUE_SIZE = 6
-MEMORY_SIZE = int('FFFFF', 16)  # Memory address space size 1MB
 CACHE_SIZE = int('10000', 16)  # Cache size 64KB
 SEGMENT_SIZE = int('10000', 16) # Maximum segment size 64KB (10000H)
 
@@ -46,14 +45,12 @@ class MainWindow(object):
 
         self.assembler = Assembler(SEG_INIT)
         self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
-        if initial_file and os.path.exists(initial_file):
-            try:
-                with open(initial_file, 'r', encoding='utf-8') as f:
-                    self.asmEdit.setPlainText(f.read())
-            except Exception:
-                self.asmEdit.setPlainText(open(_resource('default.asm')).read())
-        else:
-            self.asmEdit.setPlainText(open(_resource('default.asm')).read())
+        source_path = initial_file or _resource('default.asm')
+        try:
+            with open(source_path, encoding='utf-8') as source:
+                self.asmEdit.setPlainText(source.read())
+        except (OSError, UnicodeError) as err:
+            self.console.appendPlainText(f"Could not open {source_path}: {err}")
 
         self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.assembler, self.memory)
         self.EU = execution_unit.execution_unit(self.BIU, int_msg=True)
@@ -214,27 +211,31 @@ class MainWindow(object):
             self.EU.video_display._start_gui()
 
     def loadAssembly(self):
-        # Enable/Disable actions
+        assembly = self.asmEdit.toPlainText()
+        if not assembly.strip():
+            self.console.appendPlainText("Input Error.")
+            self.restoreEditor()
+            return
+        assembler = Assembler(SEG_INIT)
+        try:
+            exe_file = assembler.compile(assembly)
+        except Exception as err:
+            self.console.appendPlainText(f"Could not assemble the program: {err}")
+            self.restoreEditor()
+            return
+        self.assembler = assembler
+        self.exe_file = exe_file
+        self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
+        self.memory.load(self.exe_file)
+        self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.exe_file, self.memory)
+        self.EU = execution_unit.execution_unit(self.BIU, True)
+        self.cpu = CPU(self.BIU, self.EU, gui_mode=True)
         self.actionLoad.setEnabled(False)
         self.actionRun.setEnabled(True)
         self.actionPause.setEnabled(True)
         self.actionStep.setEnabled(True)
         self.actionStop.setEnabled(True)
-        editor = self.asmEdit
-        editor.setReadOnly()
-
-        assembly = editor.toPlainText()
-        if not assembly:
-            self.console.appendPlainText("Input Error.")
-            self.restoreEditor()
-            return
-        self.assembler = Assembler(SEG_INIT)
-        self.exe_file = self.assembler.compile(assembly)
-        self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
-        self.memory.load(self.exe_file)  # load code segment
-        self.BIU = bus_interface_unit.bus_interface_unit(INSTRUCTION_QUEUE_SIZE, self.exe_file, self.memory)
-        self.EU = execution_unit.execution_unit(self.BIU, True)
-        self.cpu = CPU(self.BIU, self.EU, gui_mode=True)
+        self.asmEdit.setReadOnly(True)
         self.refreshModels()
 
         self.console.appendPlainText("Initial DS: " + hex(self.BIU.reg['DS']))
@@ -251,17 +252,27 @@ class MainWindow(object):
         self.restoreEditor()
 
     def saveAction(self):
-        self.stopAction()
-        filename = QFileDialog().getSaveFileName(self.gui, 'Save file', filter='*.asm', initialFilter='*.asm')[0]
-        if os.path.exists(filename):
-            with open(filename,'w') as f:
-                text=self.asmEdit.toPlainText()
-                f.write(text)
+        filename = QFileDialog.getSaveFileName(self.gui, 'Save file', filter='Assembly files (*.asm)')[0]
+        if not filename:
+            return
+        output = QSaveFile(filename)
+        data = self.asmEdit.toPlainText().encode('utf-8')
+        if not output.open(QIODevice.WriteOnly) or output.write(data) != len(data) or not output.commit():
+            self.console.appendPlainText(f"Could not save {filename}: {output.errorString()}")
+            return
+        self.asmEdit.document().setModified(False)
 
     def openAction(self):
-        self.stopAction()
-        filename = QFileDialog().getOpenFileName(self.gui, "Open File")[0]
-        if os.path.exists(filename) and self.asmEdit.document().isModified():
+        filename = QFileDialog.getOpenFileName(self.gui, "Open File")[0]
+        if not filename:
+            return
+        try:
+            with open(filename, encoding='utf-8') as source:
+                text = source.read()
+        except (OSError, UnicodeError) as err:
+            self.console.appendPlainText(f"Could not open {filename}: {err}")
+            return
+        if self.asmEdit.document().isModified():
             answer = QMessageBox.question(self.gui, "Modified Code",
                 """<b>The current code is modified</b>
                    <p>What do you want to do?</p>
@@ -270,12 +281,8 @@ class MainWindow(object):
                 QMessageBox.Cancel)
             if answer == QMessageBox.Cancel:
                 return
-        if os.path.exists(filename):
-            text = open(filename, encoding='utf-8').read()
-            if len(text.split('\n')) < 30:
-                text += '\n' * (30-len(text.split('\n')))
-            self.asmEdit.setPlainText(text)
-            self.restoreEditor()
+        self.stopAction()
+        self.asmEdit.setPlainText(text)
 
     def emitStart(self, refresh):
         self.cpu.EU.interrupt = False

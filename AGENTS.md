@@ -115,7 +115,7 @@ The emulator is written in Python (>=3.9) and models an Intel 8086 microprocesso
   - `Bits 12–15`: Reserved / 0.
 - **Example Patterns**:
   - `0x0249` (0000 0010 0100 1001b): All Red.
-  - `0x0924` (0000 1001 0010 0100b): North & South Green, East & West Red.
+  - `0x030C` (0000 0011 0000 1100b): North & South Green, East & West Red.
 
 ### Port 7 — Virtual Stepper Motor (`OUT 7, AL` / `IN AL, 7`)
 - **Size**: 8-bit byte.
@@ -180,7 +180,7 @@ When editing or extending this codebase, adhere strictly to these rules:
    - Never use `sys.exit("Compile Error")` or bare `assert` for syntax errors. Raise `AssemblyError(message, line, source)`.
 5. **Decoupled Peripheral Architecture**:
    - Do not hardcode peripheral state inside `execution_unit.py`. Route I/O port reads/writes through `self.peripherals.read_port(port)` and `self.peripherals.write_port(port, value)`.
-6. **All 80 Unit Tests Must Pass**:
+6. **All Unit Tests Must Pass**:
    - Always run `python3 -m unittest discover tests` before pushing commits.
 
 ---
@@ -191,7 +191,7 @@ When editing or extending this codebase, adhere strictly to these rules:
 ```bash
 python3 -m unittest discover tests
 ```
-*Expected result: 80 tests passing in under 75 seconds (or ~300s under nix-shell).*
+*Install the dependencies in `requirements.txt` to include the desktop and terminal tests. The current suite contains 109 tests.*
 
 ### Run CLI Verification
 ```bash

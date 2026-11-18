@@ -10,7 +10,7 @@ import unittest
 
 from ui.tui import EmulatorTUI, SEG_INIT
 from emulator.peripherals.manager import PeripheralManager
-from emulator.memory import Memory
+from emulator.memory import MEMORY_SIZE, Memory
 from emulator.assembler import Assembler
 
 
@@ -184,7 +184,7 @@ class TestTUIModalEditor(unittest.TestCase):
         """Verify Memory.load(verbose=False) produces zero output on stdout."""
         assembler = Assembler(SEG_INIT)
         exe = assembler.compile("CODE SEGMENT\nSTART:\nMOV AX, 1\nCODE ENDS\nEND START\n")
-        mem = Memory(0xFFFF, 0x1000)
+        mem = Memory(MEMORY_SIZE, 0x10000)
 
         captured_stdout = io.StringIO()
         old_stdout = sys.stdout

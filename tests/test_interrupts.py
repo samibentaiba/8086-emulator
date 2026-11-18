@@ -6,6 +6,8 @@ and Video Memory Buffer @ 0xB8000
 import os
 import sys
 import unittest
+from datetime import datetime
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -84,6 +86,14 @@ class TestVideoDisplayAndInterrupts(unittest.TestCase):
         ch, attr = self.eu.video.read_char_at(5, 10)
         self.assertEqual(ch, ord('H'))
         self.assertEqual(attr, 0x0A)
+
+    def test_dos_time_returns_hundredths_of_a_second(self):
+        with patch('emulator.pipeline_units.execution_unit.datetime.datetime') as clock:
+            clock.now.return_value = datetime(2020, 1, 1, 12, 34, 56, 987654)
+            self.eu.write_reg('AH', 0x2c)
+            self.eu.dos_isr_21h()
+        self.assertEqual((self.eu.read_reg('CH'), self.eu.read_reg('CL')), (12, 34))
+        self.assertEqual((self.eu.read_reg('DH'), self.eu.read_reg('DL')), (56, 98))
 
     def test_dos_int_21h_version(self):
         # AH=30h: Get DOS Version

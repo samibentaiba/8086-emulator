@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "emu8086"
@@ -33,9 +33,13 @@ emu8086-gui  = "mainUI:main"
 [project.gui-scripts]
 emu8086-gui-windowed = "mainUI:main"
 
+[tool.setuptools]
+py-modules = ["main", "tui", "mainUI"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["emulator*", "ui*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.asm"]
+emulator = ["interrupt_routines/*.asm"]
+ui = ["default.asm", "mainwindow.ui", "logo.png"]

@@ -60,6 +60,70 @@ class TestTUIAdvancedScenarios(unittest.TestCase):
         self.temp_files.append(tf.name)
         return tf.name
 
+    def test_live_edit_preserves_memory_and_rewinds_into_patched_code(self):
+        code = ("DATA SEGMENT\nVALUE DW 10\nDATA ENDS\n"
+                "CODE SEGMENT\nSTART:\nMOV AX, 42\nMOV [0], AX\n"
+                "MOV BX, [0]\nHLT\nCODE ENDS\nEND START")
+        tui = EmulatorTUI(self._create_temp_asm(code))
+        tui.step()
+        tui.step()
+        tui._handle_key(None, ord('i'))
+        tui._handle_key(None, 27)
+        self.assertFalse(tui.modified)
+        self.assertEqual(tui.memory.rb(0x20000), ['0x2a'])
+
+        tui.source_lines[7] = "MOV CX, [0]"
+        tui.modified = True
+        tui._recompile_code()
+        self.assertEqual(tui.BIU.reg['IP'], 2)
+        self.assertTrue(tui.step_back())
+        tui.step()
+        tui.step()
+        self.assertEqual(tui.EU.reg['BX'], 0)
+        self.assertEqual(tui.EU.reg['CX'], 42)
+
+        tui._handle_key(None, ord('r'))
+        self.assertEqual(tui.BIU.reg['IP'], 0)
+        self.assertEqual(tui.memory.rb(0x20000), ['0xa'])
+        self.assertEqual(tui.source_lines[7], "MOV CX, [0]")
+        self.assertTrue(tui.modified)
+
+    def test_breakpoint_uses_assembled_offset_and_skips_directives(self):
+        code = ("CODE SEGMENT\nORG 100H\nSTART:\nMOV AX, DS:[0]\n"
+                "INC BX\nHLT\nCODE ENDS\nEND START")
+        tui = EmulatorTUI(self._create_temp_asm(code))
+        tui.edit_row = 1
+        tui._handle_key(None, ord('b'))
+        self.assertFalse(tui.breakpoints)
+        tui.edit_row = 4
+        tui._handle_key(None, ord('b'))
+        tui._handle_key(None, ord('c'))
+        tui.step()
+        self.assertFalse(tui.running)
+        self.assertEqual(tui.breakpoints, {0x101})
+        self.assertEqual(tui.edit_row, 4)
+
+    def test_open_invalid_source_for_editing(self):
+        code = "CODE SEGMENT\nSTART:\nVALUE DB BAD\nHLT\nCODE ENDS\nEND START"
+        tui = EmulatorTUI(self._create_temp_asm(code))
+        self.assertIn("AssemblyError", tui.status_msg)
+        self.assertFalse(tui.step())
+        self.assertEqual(tui.source_lines[2], "VALUE DB BAD")
+        tui.source_lines[2] = "MOV AX, 42"
+        tui._recompile_code()
+        self.assertTrue(tui.step())
+        self.assertEqual(tui.EU.reg['AX'], 42)
+
+    def test_interrupt_handler_at_same_offset_does_not_trigger_source_breakpoint(self):
+        program = "CODE SEGMENT\nSTART: INT 7Ch\nHLT\nCODE ENDS\nEND START"
+        tui = EmulatorTUI(self._create_temp_asm(program))
+        tui.breakpoints.add(0)
+        tui.running = True
+        tui.step()
+        self.assertEqual(tui.BIU.reg['IP'], 0)
+        self.assertNotEqual(tui.BIU.reg['CS'], SEG_INIT['CS'])
+        self.assertTrue(tui.running)
+
     def test_01_student_live_patching_and_reverse_debugging_workflow(self):
         """
         Complex student scenario:
@@ -186,6 +250,15 @@ class TestTUIAdvancedScenarios(unittest.TestCase):
             self.assertLess(x, 80, f"X coordinate out of bounds: {x} >= 80")
             # Text must not spill past screen width
             self.assertLessEqual(x + len(text), 80, f"Spillover: x({x}) + len({len(text)}) > 80: '{text}'")
+
+    @patch('curses.color_pair', return_value=0)
+    def test_memory_inspector_can_display_code(self, mock_cp):
+        path = self._create_temp_asm("CODE SEGMENT\nSTART: MOV AX, 1\nHLT\nCODE ENDS\nEND START")
+        tui = EmulatorTUI(path)
+        tui.mem_seg_idx = tui.mem_segments.index('CS')
+        win = MockCursesWindow()
+        tui._render_memory(win, 0, 0, 6, 80)
+        self.assertTrue(any("30000:  -- -- 00" in text for _, _, text, _ in win.calls))
 
     def test_03_bidirectional_multi_breakpoint_stepping(self):
         """

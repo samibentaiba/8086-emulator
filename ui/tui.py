@@ -4,7 +4,6 @@ LazyVim-style modular interactive debugger, in-TUI modal code editor, and virtua
 """
 
 import os
-import re
 import sys
 import time
 
@@ -14,14 +13,12 @@ except ImportError:
     curses = None
 
 from emulator.assembler import Assembler, to_decimal
-from emulator.instructions import all_ins
 from emulator.cpu import CPU
-from emulator.memory import Memory
+from emulator.memory import ADDRESS_MASK, MEMORY_SIZE, Memory
 from emulator.pipeline_units import bus_interface_unit, execution_unit
 from emulator.peripherals.video_display import VIDEO_MEM_BASE
 from emulator.peripherals.manager import PeripheralManager
 
-MEMORY_SIZE = int('FFFFF', 16)
 SEGMENT_SIZE = int('10000', 16)
 INSTRUCTION_QUEUE_SIZE = 6
 
@@ -101,6 +98,15 @@ class EmulatorTUI:
 
         # Load and initialize CPU
         self._load_file()
+        self.asm_code = "\n".join(self.source_lines)
+        self.assembly_error = None
+        try:
+            self.exe_file = Assembler(SEG_INIT).compile(self.asm_code)
+        except Exception as err:
+            self.exe_file = Assembler(SEG_INIT)
+            self.asm_code = None
+            self.assembly_error = f"AssemblyError: {err} (press 'i' to fix)"
+            self.status_msg = self.assembly_error
         self._init_cpu()
 
     def _load_file(self):
@@ -122,57 +128,14 @@ class EmulatorTUI:
         self.edit_col = 0
         self.source_scroll_y = 0
         self.source_scroll_x = 0
-        self._build_source_mapping()
-
-    def _build_source_mapping(self):
-        """Build exact 1-to-1 mapping between physical IP offsets and source lines."""
-        self.ip_to_source_line = {}
-        self.source_line_to_ip = {}
-        has_code_seg = any('CODE' in l.upper() and 'SEGMENT' in l.upper() for l in self.source_lines)
-        in_code = not has_code_seg
-        ip = 0
-        for idx, raw in enumerate(self.source_lines):
-            line = raw.split(';')[0].strip()
-            if not line:
-                continue
-            tokens = [t for t in re.split(r'[\s,:]+', line.upper()) if t]
-            if not tokens:
-                continue
-            if 'CODE' in tokens and 'SEGMENT' in tokens:
-                in_code = True
-                continue
-            if in_code and has_code_seg and ('ENDS' in tokens or 'END' in tokens):
-                if 'ENDS' in tokens:
-                    in_code = False
-                    continue
-            if in_code:
-                if line.endswith(':'):
-                    continue
-                if ':' in line:
-                    parts = line.split(':', 1)
-                    after = parts[1].strip()
-                    if not after:
-                        continue
-                    first_tok = re.split(r'[\s,]+', after.upper())[0]
-                else:
-                    first_tok = tokens[0]
-                if first_tok in all_ins or any(first_tok.startswith(ins) for ins in all_ins):
-                    self.ip_to_source_line[ip] = idx
-                    self.source_line_to_ip[idx] = ip
-                    ip += 1
 
     def _init_cpu(self):
         # Reset peripheral manager singleton to ensure clean state
+        if hasattr(self, 'cpu'):
+            self.cpu.close()
         PeripheralManager.reset_instance()
         PeripheralManager.get_instance(enable_gui=self.enable_gui_windows)
 
-        # Reset and compile
-        self.assembler = Assembler(SEG_INIT)
-        try:
-            self.exe_file = self.assembler.compile(self.asm_code)
-        except Exception as err:
-            print(f"\n{err}\n")
-            sys.exit(1)
         self.memory = Memory(MEMORY_SIZE, SEGMENT_SIZE)
         self.memory.load(self.exe_file)
 
@@ -190,34 +153,72 @@ class EmulatorTUI:
         self.follow_ip = True
 
     def _cache_instructions(self):
+        self.assembler = self.exe_file
+        self.ip_to_source_line = self.exe_file.ip_to_source_line
+        self.source_line_to_ip = {line: ip for ip, line in self.ip_to_source_line.items()}
         cs_space = self.exe_file.space.get('CS', [])
-        cs_len = self.exe_file.seg_len.get('CS', len(cs_space))
         self.instructions = []
-        for idx in range(cs_len):
+        for idx in sorted(self.ip_to_source_line):
             item = cs_space[idx]
-            if item != ['0']:
-                opcode = item[0]
-                opds = ", ".join(item[1:]) if len(item) > 1 else ""
-                self.instructions.append((idx, opcode, opds))
+            self.instructions.append((idx, item[0], ", ".join(item[1:])))
 
-    def _recompile_code(self):
+    def _patch_instructions(self, new_exe):
+        """Replace instructions in place when the existing execution state still fits."""
+        old = self.exe_file
+        if old.ip != new_exe.ip or old.ip_to_source_line.keys() != new_exe.ip_to_source_line.keys():
+            return False
+        changes = {}
+        for segment in old.space.keys() | new_exe.space.keys():
+            before = old.space.get(segment, [])
+            after = new_exe.space.get(segment, [])
+            if before == after:
+                continue
+            if segment != 'CS' or len(before) != len(after):
+                return False
+            base = int(new_exe.seg_adr[segment], 16) << 4
+            for offset, (original, edited) in enumerate(zip(before, after)):
+                if original != edited:
+                    if offset not in new_exe.ip_to_source_line:
+                        return False
+                    changes[base + offset] = edited
+        if changes:
+            # Undoing a guest write to a patched instruction could restore old code.
+            if any(addr in changes for s in self.cpu.history for addr, _ in s.memory_changes):
+                return False
+            for address, instruction in changes.items():
+                self.memory.wb(address, instruction)
+            self.BIU.flush_pipeline()
+            for snapshot in self.cpu.history:
+                snapshot.biu_queue.clear()
+                snapshot.biu_pre_fetch_ip = snapshot.biu_reg['IP']
+        return True
+
+    def _recompile_code(self, reset=False):
         """On-the-fly reassembly when exiting INSERT mode (<Esc>)."""
         new_code = "\n".join(self.source_lines)
-        try:
-            new_asm = Assembler(SEG_INIT)
-            new_exe = new_asm.compile(new_code)
-            self.assembler = new_asm
+        if new_code != self.asm_code:
+            try:
+                new_exe = Assembler(SEG_INIT).compile(new_code)
+            except Exception as err:
+                self.assembly_error = f"AssemblyError: {err} (press 'i' to fix)"
+                self.status_msg = self.assembly_error
+                self.ip_to_source_line = {}
+                self.source_line_to_ip = {}
+                self.running = False
+                return
+            reset = reset or not self._patch_instructions(new_exe)
+            if new_exe.ip_to_source_line.keys() != self.exe_file.ip_to_source_line.keys():
+                self.breakpoints.clear()
             self.exe_file = new_exe
-            self.memory.load(self.exe_file)
-            if hasattr(self, 'BIU') and self.BIU:
-                self.BIU.flush_pipeline()
+            self.asm_code = new_code
+        self.assembly_error = None
+        self.status_msg = f"Assembled successfully ({len(self.source_lines)} lines)."
+        if reset:
+            self._init_cpu()
+            self.status_msg += " CPU reset to the entry point."
+        else:
             self._cache_instructions()
-            self._build_source_mapping()
-            self.need_full_clear = True
-            self.status_msg = f"Assembled successfully ({len(self.source_lines)} lines)."
-            self.modified = True
-        except Exception as err:
-            self.status_msg = f"AssemblyError: {err} (press 'i' to fix)"
+        self.need_full_clear = True
 
     @property
     def filename(self):
@@ -261,18 +262,27 @@ class EmulatorTUI:
         snap['DF'] = self.EU.FR.direction
         return snap
 
+    def _source_ip(self):
+        if self.BIU.reg['CS'] == int(self.exe_file.seg_adr['CS'], 16):
+            return self.BIU.reg['IP']
+        return None
+
+    def _follow_source(self, ip):
+        if self.follow_ip and ip in self.ip_to_source_line:
+            self.edit_row = self.ip_to_source_line[ip]
+            self.disasm_cursor_idx = next(idx for idx, instruction in enumerate(self.instructions)
+                                          if instruction[0] == ip)
+
     def step(self):
+        if self.assembly_error:
+            self.running = False
+            self.status_msg = self.assembly_error
+            return False
         if not self.cpu.check_done():
             self.prev_regs = self._snapshot_regs()
             self.cpu.iterate(debug=False)
-            current_ip = self.BIU.reg.get('IP', 0)
-            if self.follow_ip:
-                for idx, (offset, opc, _) in enumerate(self.instructions):
-                    if offset == current_ip:
-                        self.disasm_cursor_idx = idx
-                        break
-                if current_ip in self.ip_to_source_line:
-                    self.edit_row = self.ip_to_source_line[current_ip]
+            current_ip = self._source_ip()
+            self._follow_source(current_ip)
             if current_ip in self.breakpoints:
                 self.running = False
                 self.status_msg = f"Breakpoint hit at IP={current_ip:04X}h!"
@@ -284,6 +294,10 @@ class EmulatorTUI:
 
     def step_back(self):
         """Rewind CPU state by 1 instruction, reverting registers, memory, and flags."""
+        if self.assembly_error:
+            self.running = False
+            self.status_msg = self.assembly_error
+            return False
         if not self.cpu.can_step_back():
             self.running = False
             self.status_msg = "Already at start of execution (Cycle 0)."
@@ -292,18 +306,14 @@ class EmulatorTUI:
         old_regs = self._snapshot_regs()
         if self.cpu.step_back():
             self.prev_regs = old_regs  # Reverted registers and flags will highlight in yellow!
-            current_ip = self.BIU.reg.get('IP', 0)
-            if self.follow_ip:
-                for idx, (offset, opc, _) in enumerate(self.instructions):
-                    if offset == current_ip:
-                        self.disasm_cursor_idx = idx
-                        break
-                if current_ip in self.ip_to_source_line:
-                    self.edit_row = self.ip_to_source_line[current_ip]
+            current_ip = self._source_ip()
+            self._follow_source(current_ip)
 
             if current_ip in self.breakpoints:
                 self.running = False
                 self.status_msg = f"Reverse breakpoint hit at IP={current_ip:04X}h!"
+            elif current_ip is None:
+                self.status_msg = f"Stepped back to {self.BIU.reg['CS']:04X}:{self.BIU.reg['IP']:04X}."
             else:
                 undone_line = self.source_lines[self.edit_row].strip() if self.edit_row < len(self.source_lines) else ""
                 self.status_msg = f"⏪ Stepped back to IP={current_ip:04X}h (Cycle {self.cpu.cycle_count}): {undone_line}"
@@ -327,6 +337,7 @@ class EmulatorTUI:
         try:
             curses.wrapper(self._main_loop)
         finally:
+            self.cpu.close()
             PeripheralManager.reset_instance()
 
     def _init_colors(self):
@@ -545,8 +556,7 @@ class EmulatorTUI:
 
         self.edit_row = max(0, min(len(self.source_lines) - 1, self.edit_row))
 
-        current_ip = self.BIU.reg.get('IP', 0)
-        exec_line_idx = self.ip_to_source_line.get(current_ip, -1)
+        exec_line_idx = self.ip_to_source_line.get(self._source_ip(), -1)
 
         # Viewport vertical scrolling: follow executing line when follow_ip is True, else edit_row
         target_row = exec_line_idx if (self.follow_ip and exec_line_idx >= 0) else self.edit_row
@@ -808,6 +818,14 @@ class EmulatorTUI:
         else:
             self._safe_addstr(win, y + 7, x + 2, " Console: (no output yet)", curses.color_pair(8), max_w=max(0, w - 4))
 
+    def _memory_byte(self, address):
+        cell = self.BIU.read_byte(address)
+        try:
+            return to_decimal(cell[0])
+        except ValueError:
+            # The assembler stores instructions as tokens without a byte encoding.
+            return None
+
     def _render_memory(self, win, y, x, h, w):
         is_focused = (self.focused_pane == 'memory')
         cur_seg_name = self.mem_segments[self.mem_seg_idx]
@@ -825,21 +843,17 @@ class EmulatorTUI:
         inner_w = max(0, w - 2)
 
         for row in range(content_h):
-            row_addr = base_addr + row * bytes_per_row
-            if row_addr >= MEMORY_SIZE:
-                break
+            row_addr = (base_addr + row * bytes_per_row) & ADDRESS_MASK
 
             hex_bytes = []
             ascii_chars = []
             for b_idx in range(bytes_per_row):
-                addr = row_addr + b_idx
-                if addr < MEMORY_SIZE:
-                    val_raw = self.memory.rb(addr)
-                    val = to_decimal(val_raw[0]) if isinstance(val_raw, list) else to_decimal(val_raw)
+                val = self._memory_byte(row_addr + b_idx)
+                if val is not None:
                     hex_bytes.append(f"{val:02X}")
                     ascii_chars.append(chr(val) if (32 <= val <= 126) else ".")
                 else:
-                    hex_bytes.append("..")
+                    hex_bytes.append("--")
                     ascii_chars.append(" ")
 
             hex_str = " ".join(hex_bytes[:8])
@@ -871,21 +885,20 @@ class EmulatorTUI:
             row = y + 2 + i
             if row >= y + h - 1:
                 break
-            word_offset = sp + (i * 2)
-            phys = ss_phys + word_offset
-            if phys + 1 < MEMORY_SIZE:
-                raw_lo = self.memory.rb(phys)
-                raw_hi = self.memory.rb(phys + 1)
-                lo = to_decimal(raw_lo[0]) if isinstance(raw_lo, list) else to_decimal(raw_lo)
-                hi = to_decimal(raw_hi[0]) if isinstance(raw_hi, list) else to_decimal(raw_hi)
+            word_offset = (sp + i * 2) & 0xffff
+            phys = (ss_phys + word_offset) & ADDRESS_MASK
+            lo = self._memory_byte(phys)
+            hi = self._memory_byte(phys + 1)
+            if lo is not None and hi is not None:
                 word_val = (hi << 8) | lo
-                is_top = (i == 0)
-                prefix = "▶ SP+%02X" % (i * 2) if is_top else "  SP+%02X" % (i * 2)
-                row_text = f" {prefix}  {phys:05X}h   {word_val:04X}h = {word_val}"
-                attr = (curses.color_pair(3) | curses.A_BOLD) if is_top else curses.color_pair(2)
-                self._safe_addstr(win, row, x + 1, row_text.ljust(inner_w)[:inner_w], attr, max_w=inner_w)
+                value_text = f"{word_val:04X}h = {word_val}"
             else:
-                self._safe_addstr(win, row, x + 2, f"  (address {phys:05X}h out of range)", curses.color_pair(8), max_w=max(0, w - 4))
+                value_text = "----"
+            is_top = (i == 0)
+            prefix = "▶ SP+%02X" % (i * 2) if is_top else "  SP+%02X" % (i * 2)
+            row_text = f" {prefix}  {phys:05X}h   {value_text}"
+            attr = (curses.color_pair(3) | curses.A_BOLD) if is_top else curses.color_pair(2)
+            self._safe_addstr(win, row, x + 1, row_text.ljust(inner_w)[:inner_w], attr, max_w=inner_w)
 
     def _render_console_view(self, win, y, x, h, w):
         """Render full scrollable program output (OUT commands, DOS strings)."""
@@ -1277,18 +1290,16 @@ class EmulatorTUI:
 
         elif key in [ord('r'), ord('R')]:
             self.running = False
-            self._load_file()
-            self._init_cpu()
-            self.need_full_clear = True
-            self.status_msg = "CPU reset and reloaded to initial state."
+            self._recompile_code(reset=True)
 
         elif key in [ord('b'), ord('B')]:
-            if self.focused_pane == 'disasm' and self.edit_row in self.source_line_to_ip:
-                target_ip = self.source_line_to_ip[self.edit_row]
-            elif self.focused_pane == 'disasm' and self.instructions:
-                target_ip = self.instructions[min(self.disasm_cursor_idx, len(self.instructions) - 1)][0]
+            if self.focused_pane == 'disasm':
+                target_ip = self.source_line_to_ip.get(self.edit_row)
             else:
-                target_ip = self.BIU.reg.get('IP', 0)
+                target_ip = self._source_ip()
+            if target_ip not in self.ip_to_source_line or self.assembly_error:
+                self.status_msg = "Select an assembled instruction to set a breakpoint."
+                return True
 
             if target_ip in self.breakpoints:
                 self.breakpoints.remove(target_ip)

@@ -50,7 +50,7 @@ class execution_unit(object):
     def video(self):
         if self.video_display is None:
             from emulator.peripherals.video_display import VideoDisplayDevice
-            self.video_display = VideoDisplayDevice(memory=self.bus.memory, enable_gui=True)
+            self.video_display = VideoDisplayDevice(memory=self.bus.memory, enable_gui=self.peripherals.enable_gui)
         return self.video_display
 
     def read_asciiz_from_mem(self, seg, offset):
@@ -76,7 +76,7 @@ class execution_unit(object):
     def run(self):
         self.IR = self.bus.instruction_queue.get()
         self.opcode = self.IR[0]
-        self.bus.reg['IP'] += 1
+        self.inc_reg('IP', 1)
         self.opd = []
         if len(self.IR) > 1:
             self.opd = self.IR[1:]
@@ -85,7 +85,8 @@ class execution_unit(object):
 
     def get_opbyte(self):
         self.opbyte = 2
-        for pr in self.opd:
+        width_operands = self.opd[:1] if self.opcode in rotate_shift_ins else self.opd
+        for pr in width_operands:
             if pr in ['AL', 'AH', 'BL', 'BH', 'CL', 'CH', 'DL', 'DH']:
                 self.opbyte = 1
         if 'PTR' in self.opd:
@@ -121,7 +122,7 @@ class execution_unit(object):
     def write_reg(self, reg, num):
         # self.print(f"writing {hex(num)} => {num} to {reg} ...\n")
 
-        num = self.to_unsigned(num) & 0xffff
+        num &= 0xffff
         if reg in self.biu_regs:
             self.bus.reg[reg] = num
         elif reg[1] == 'H':
@@ -138,44 +139,20 @@ class execution_unit(object):
         self.write_reg(reg, self.read_reg(reg) + val)
 
     def get_address(self, opd):
-        # Resolve all memory addressing: direct, register indirect, base, index, base-index, relative base-index
-        adr_reg = ['BX', 'SI', 'DI', 'BP']
-        seg_reg = ['DS', 'CS', 'SS', 'ES']
-        par_list = [s for s in re.split(r'\W', opd) if s]
-        address = 0
-        has_seg = False
-        for par in par_list:
-            if par in adr_reg:
-                address += self.read_reg(par)
-            elif par in seg_reg:
-                address += self.read_reg(par) << 4
-                has_seg = True
-            else:
-                address += to_decimal(par)
-        if not has_seg:
-            if 'BP' in par_list: # Default segment register is SS when BP is present
-                address += self.read_reg('SS') << 4
-            else:
-                address += self.read_reg('DS') << 4
-        # self.print("Get Address " + hex(address) + " from operand: " + opd)
-        return address
+        prefix, separator, _ = opd.partition(':')
+        if separator:
+            segment = self.read_reg(prefix) if prefix in self.biu_regs else to_decimal(prefix)
+        else:
+            segment = self.read_reg('SS' if re.search(r'\bBP\b', opd) else 'DS')
+        return (segment << 4) + self.get_offset(opd)
 
     def get_offset(self, opd):
-        # Resolve memory addressing offset: direct, register indirect, base, index, base-index
-        # lea 0x3412:0x34; lea [si+bx]; lea 0x12; lea ss:offset; lea [bx][di]
-        adr_reg = ['BX', 'SI', 'DI', 'BP']
-        seg_reg = ['DS', 'CS', 'SS', 'ES']
-        opd = opd.split(':')[-1] # Remove segment prefix
-        par_list = [s for s in re.split(r'\W', opd) if s]
+        expression = opd.split(':')[-1]
         offset = 0
-        for par in par_list:
-            if par in adr_reg:
-                offset += self.read_reg(par)
-            elif par in seg_reg:
-                pass
-            else:
-                offset += to_decimal(par)
-        return offset
+        for sign, term in re.findall(r'([+-]?)\s*(\w+)', expression):
+            value = self.read_reg(term) if term in ('BX', 'BP', 'SI', 'DI') else to_decimal(term)
+            offset += -value if sign == '-' else value
+        return offset & 0xffff
 
     def __get_byte(self, opd):
         # Memory addressing containing '[]'
@@ -204,12 +181,12 @@ class execution_unit(object):
         # Automatically get operand value
         # If opd is int, access as memory address
         if isinstance(opd, int):
-            opd = '[' + str(opd) + ']'
+            return self.get_int_from_adr(opd)
         # Register
         if self.is_reg(opd):
             res = self.read_reg(opd)
         # Memory
-        elif '[' in opd:
+        elif self.is_mem(opd):
             if self.opbyte == 1:
                 res_list = self.__get_byte(opd)
             elif self.opbyte == 2:
@@ -258,7 +235,7 @@ class execution_unit(object):
         return opd in (self.eu_regs + self.biu_regs)
 
     def is_mem(self, opd):
-        return '[' in opd
+        return '[' in opd and not opd.startswith(("'", '"'))
 
     def write_mem(self, loc, content):
         # Automatically write to memory
@@ -315,15 +292,11 @@ class execution_unit(object):
             adr = self.get_offset(self.opd[1])
             self.put_int(self.opd[0], adr)
 
-        elif self.opcode == 'LDS':
+        elif self.opcode in ('LDS', 'LES'):
             adr = self.get_address(self.opd[1])
+            self.opbyte = 2  # Both fields of the far pointer are 16-bit words.
             self.write_reg(self.opd[0], self.get_int(adr))
-            self.write_reg('DS', self.get_int(adr + 2))
-
-        elif self.opcode == 'LES':
-            adr = self.get_address(self.opd[1])
-            self.write_reg(self.opd[0], self.get_int(adr))
-            self.write_reg('ES', self.get_int(adr + 2))
+            self.write_reg('DS' if self.opcode == 'LDS' else 'ES', self.get_int(adr + 2))
         else:
             pass
 
@@ -337,38 +310,22 @@ class execution_unit(object):
 
     # Convert num to signed decimal based on opbyte
     def to_signed(self, num):
-        result = 0
-        for i in range(self.opbyte * 8):
-            if i == self.opbyte * 8 - 1:
-                result -= (num >> i & 1) << i
-            else:
-                result += (num >> i & 1) << i
-        return result
+        unsigned = self.to_unsigned(num)
+        sign_bit = 1 << (self.opbyte * 8 - 1)
+        return (unsigned ^ sign_bit) - sign_bit
 
-    # Convert num to unsigned decimal based on opbyte
     def to_unsigned(self, num):
-        result = 0
-        for i in range(self.opbyte * 8):
-            result += (num >> i & 1) << i
-        return result
+        return num & ((1 << (self.opbyte * 8)) - 1)
 
-    # Check for signed overflow based on opbyte range
     def is_overflow(self, num):
-        low = self.to_signed(int('1' + (self.opbyte * 8 - 1) * '0', 2))
-        high = self.to_signed(int('0' + (self.opbyte * 8 - 1) * '1', 2))
-        return num > high or num < low
+        limit = 1 << (self.opbyte * 8 - 1)
+        return not -limit <= num < limit
 
     def set_pf(self, result):
-        if self.popcount(result) % 2 == 0:
-            self.FR.parity = 1
-        else:
-            self.FR.parity = 0
+        self.FR.parity = int(self.popcount(result & 0xff) % 2 == 0)
 
     def set_of(self, result):
-        if self.is_overflow(result):
-            self.FR.overflow = 1
-        else:
-            self.FR.overflow = 0
+        self.FR.overflow = int(self.is_overflow(result))
 
     def set_sf(self, result):
         if self.to_signed(result) < 0:
@@ -388,118 +345,89 @@ class execution_unit(object):
         else:
             self.FR.carry = 0
 
+    def _add_subtract(self, left, right, *, subtract=False, carry=0, preserve_carry=False):
+        left = self.to_unsigned(left)
+        right = self.to_unsigned(right)
+        if subtract:
+            value = left - right - carry
+            signed_value = self.to_signed(left) - self.to_signed(right) - carry
+        else:
+            value = left + right + carry
+            signed_value = self.to_signed(left) + self.to_signed(right) + carry
+        result = self.to_unsigned(value)
+        self.set_of(signed_value)
+        if not preserve_carry:
+            self.set_cf(value != result)
+        self.FR.auxiliary = ((left ^ right ^ result) >> 4) & 1
+        self.set_pf(result)
+        self.set_zf(result)
+        self.set_sf(result)
+        return result
+
     def arithmetic_ins(self):
-        if self.opcode == 'ADD':
-            res1 = self.get_int(self.opd[0])
-            res2 = self.get_int(self.opd[1])
-            result = (res1 + res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 + res2)
-            self.set_cf(((self.to_unsigned(res1) + self.to_unsigned(res2)) >> (self.opbyte * 8)) > 0)
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
+        if self.opcode in ('ADD', 'ADC', 'SUB', 'SBB'):
+            left = self.get_int(self.opd[0])
+            right = self.get_int(self.opd[1])
+            carry = self.FR.carry if self.opcode in ('ADC', 'SBB') else 0
+            result = self._add_subtract(left, right, subtract=self.opcode in ('SUB', 'SBB'), carry=carry)
             self.put_int(self.opd[0], result)
 
-        elif self.opcode == 'ADC':
-            res1 = self.get_int(self.opd[0])
-            res2 = self.get_int(self.opd[1])
-            result = (res1 + res2 + self.FR.carry) & int(
-                "0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 + res2 + self.FR.carry)
-            self.set_cf(((self.to_unsigned(res1) + self.to_unsigned(res2) + self.FR.carry) >> (self.opbyte * 8)) > 0)
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
-            self.put_int(self.opd[0], result)
-
-        elif self.opcode == 'SUB':
-            res1 = self.get_int(self.opd[0])
-            res2 = self.get_int(self.opd[1])
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
-            self.put_int(self.opd[0], result)
-
-        elif self.opcode == 'SBB':
-            res1 = self.get_int(self.opd[0])
-            res2 = self.get_int(self.opd[1])
-            result = (res1 - res2 - self.FR.carry) & int(
-                "0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2 - self.FR.carry)
-            if self.FR.carry == 1:
-                self.set_cf(self.to_unsigned(res1) <= self.to_unsigned(res2))
+        elif self.opcode in ('MUL', 'IMUL'):
+            left = self.read_reg('AL' if self.opbyte == 1 else 'AX')
+            right = self.get_int(self.opd[0])
+            if self.opcode == 'IMUL':
+                product = self.to_signed(left) * self.to_signed(right)
+                overflow = self.is_overflow(product)
             else:
-                self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+                product = left * right
+                overflow = product != self.to_unsigned(product)
+            self.write_reg('AX', product)
+            if self.opbyte == 2:
+                self.write_reg('DX', product >> 16)
+            self.FR.overflow = self.FR.carry = int(overflow)
 
-            self.put_int(self.opd[0], result)
+        elif self.opcode in ('DIV', 'IDIV'):
+            bits = self.opbyte * 8
+            divisor = self.to_unsigned(self.get_int(self.opd[0]))
+            dividend = self.read_reg('AX')
+            if self.opbyte == 2:
+                dividend |= self.read_reg('DX') << 16
+            if divisor == 0:
+                self.interrupt_handler(0)
+                return
+            if self.opcode == 'IDIV':
+                divisor = self.to_signed(divisor)
+                sign_bit = 1 << (2 * bits - 1)
+                dividend = (dividend ^ sign_bit) - sign_bit
+                # Signed division truncates toward zero and preserves the dividend's remainder sign.
+                quotient = abs(dividend) // abs(divisor)
+                if (dividend < 0) != (divisor < 0):
+                    quotient = -quotient
+                remainder = dividend - quotient * divisor
+                overflow = self.is_overflow(quotient)
+            else:
+                quotient, remainder = divmod(dividend, divisor)
+                overflow = quotient != self.to_unsigned(quotient)
+            if overflow:
+                self.interrupt_handler(0)
+                return
+            self.write_reg('AL' if self.opbyte == 1 else 'AX', quotient)
+            self.write_reg('AH' if self.opbyte == 1 else 'DX', remainder)
 
-        elif self.opcode == 'MUL':
-            assert self.opbyte in [1, 2]
-            res2 = self.get_int(self.opd[0])
-            if self.opbyte == 1:
-                res1 = self.read_reg('AL')
-                self.write_reg('AX', res1 * res2)
-                if self.read_reg('AH') > 0:
-                    self.FR.carry = self.FR.overflow = 1
-                else:
-                    self.FR.carry = self.FR.overflow = 0
-            elif self.opbyte == 2:
-                res1 = self.read_reg('AX')
-                result = res1 * res2
-                self.write_reg('AX', result & 0xff)
-                self.write_reg('DX', (result >> 8) & 0xff)
-                if self.read_reg('DX') > 0:
-                    self.FR.carry = self.FR.overflow = 1
-                else:
-                    self.FR.carry = self.FR.overflow = 0
+        elif self.opcode == 'AAM':
+            radix = self.get_int(self.opd[0]) & 0xff if self.opd else 10
+            if radix == 0:
+                self.interrupt_handler(0)
+                return
+            high, low = divmod(self.read_reg('AL'), radix)
+            self.write_reg('AX', (high << 8) | low)
+            self.FR.sign = low >> 7
+            self.set_zf(low)
+            self.set_pf(low)
 
-        elif self.opcode == 'DIV':
-            assert self.opbyte in [1, 2]
-            res2 = self.get_int(self.opd[0])
-            if res2 == 0:
-                self.interrupt_handler(0) # int 0：division by zero
-            elif self.opbyte == 1:
-                res1 = self.read_reg('AX')
-                self.write_reg('AL', res1 // res2)
-                self.write_reg('AH', res1 % res2)
-            elif self.opbyte == 2:
-                res1 = (self.read_reg('DX') << 8) + self.read_reg('AX')
-                self.write_reg('AX', res1 // res2)
-                self.write_reg('DX', res1 % res2)
-
-        elif self.opcode == 'INC':
-            res1 = self.get_int(self.opd[0])
-            result = (res1 + 1) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 + 1)
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
-            self.put_int(self.opd[0], result)
-
-        elif self.opcode == 'DEC':
-            res1 = self.get_int(self.opd[0])
-            result = (res1 - 1) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - 1)
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
+        elif self.opcode in ('INC', 'DEC'):
+            value = self.get_int(self.opd[0])
+            result = self._add_subtract(value, 1, subtract=self.opcode == 'DEC', preserve_carry=True)
             self.put_int(self.opd[0], result)
 
         elif self.opcode == 'CBW':
@@ -564,29 +492,11 @@ class execution_unit(object):
             self.put_int(self.opd[0], ~res1)
 
         elif self.opcode == 'NEG':
-            res1 = self.get_int(self.opd[0])
-            result = ((~res1) + 1) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of((~res1) + 1)
-
-            self.set_cf((self.to_unsigned(~res1) + 1) >> (self.opbyte * 8) > 0)
-
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
-
-            self.put_int(self.opd[0], result)
+            value = self.get_int(self.opd[0])
+            self.put_int(self.opd[0], self._add_subtract(0, value, subtract=True))
 
         elif self.opcode == 'CMP':
-            res1 = self.get_int(self.opd[0])
-            res2 = self.get_int(self.opd[1])
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+            self._add_subtract(self.get_int(self.opd[0]), self.get_int(self.opd[1]), subtract=True)
 
         elif self.opcode == 'TEST':
             res1 = self.get_int(self.opd[0])
@@ -659,59 +569,30 @@ class execution_unit(object):
                 res = temp
             self.put_int(self.opd[0], res)
 
-        elif self.opcode == 'SAL':
-            res = self.get_int(self.opd[0])
-            cnt = self.get_int(self.opd[1])
-            while cnt:
-                cnt -= 1
-                temp = res << 1
-                self.FR.carry = temp >> (self.opbyte * 8) & 1
-                if (temp >> (self.opbyte * 8 - 1) & 1) == \
-                    (res >> (self.opbyte * 8 - 1) & 1):
-                    self.FR.overflow = 0
+        elif self.opcode in ('SAL', 'SHL', 'SAR', 'SHR'):
+            count = self.get_int(self.opd[1])
+            if count == 0:
+                return
+            value = self.get_int(self.opd[0])
+            sign_bit = 1 << (self.opbyte * 8 - 1)
+            for _ in range(count):
+                original_sign = value & sign_bit
+                if self.opcode in ('SAL', 'SHL'):
+                    self.FR.carry = int(bool(original_sign))
+                    value = self.to_unsigned(value << 1)
+                    self.FR.overflow = int((value & sign_bit) != original_sign)
                 else:
-                    self.FR.overflow = 1
-                res = temp & int('1' * self.opbyte * 8, 2)
-            self.put_int(self.opd[0], res)
-
-        elif self.opcode == 'SHL':
-            res = self.get_int(self.opd[0])
-            cnt = self.get_int(self.opd[1])
-            while cnt:
-                cnt -= 1
-                temp = res << 1
-                self.FR.carry = temp >> (self.opbyte * 8) & 1
-                if (temp >> (self.opbyte * 8 - 1) & 1) == \
-                    (res >> (self.opbyte * 8 - 1) & 1):
-                    self.FR.overflow = 0
-                else:
-                    self.FR.overflow = 1
-                res = temp & int('1' * self.opbyte * 8, 2)
-            self.put_int(self.opd[0], res)
-
-        elif self.opcode == 'SAR':
-            res = self.get_int(self.opd[0])
-            cnt = self.get_int(self.opd[1])
-            while cnt:
-                cnt -= 1
-                self.FR.carry = res & 1
-                self.FR.overflow = 0
-                op = res >> (self.opbyte * 8 - 1) & 1
-                res = (res >> 1) + (op << (self.opbyte * 8 - 1))
-            self.put_int(self.opd[0], res)
-
-        elif self.opcode == 'SHR':
-            res = self.get_int(self.opd[0])
-            cnt = self.get_int(self.opd[1])
-            while cnt:
-                cnt -= 1
-                self.FR.carry = res & 1
-                if res >> (self.opbyte * 8 - 1) & 1:
-                    self.FR.overflow = 1
-                else:
-                    self.FR.overflow = 0
-                res >>= 1
-            self.put_int(self.opd[0], res)
+                    self.FR.carry = value & 1
+                    value >>= 1
+                    if self.opcode == 'SAR':
+                        value |= original_sign
+                        self.FR.overflow = 0
+                    else:
+                        self.FR.overflow = int(bool(original_sign))
+            self.set_sf(value)
+            self.set_zf(value)
+            self.set_pf(value)
+            self.put_int(self.opd[0], value)
 
         else:
             sys.exit("operation code not support")
@@ -750,20 +631,32 @@ class execution_unit(object):
 
     def transfer_control_ins(self):
         
-        if self.opcode == 'JMP':
-            # self.opbyte = 2
-            if self.is_mem(self.opd[0]): # Target address in memory: jmp word/dword ptr [adr]
-                adr = self.get_address(self.opd[0])
-                if self.opbyte == 4:
-                    self.opbyte = 2
-                    self.write_reg('CS', self.get_int(adr + 2))
-                self.write_reg('IP', self.get_int(adr))
-            elif ':' in self.opd[0]:    # Far jump: jmp cs:ip
-                self.opd = [s for s in re.split(' |:', self.opd[0]) if s]
-                self.write_reg('CS', self.get_int(self.opd[0]))
-                self.write_reg('IP', self.get_int(self.opd[1]))
-            else:                     # Short jump, near jump, register jump: jmp ip/reg
-                self.write_reg('IP', self.get_int(self.opd[0]))
+        if self.opcode in ('JMP', 'CALL'):
+            target = self.opd[0]
+            segment = None
+            if self.is_mem(target):
+                address = self.get_address(target)
+                far_pointer = self.opbyte == 4
+                self.opbyte = 2
+                offset = self.get_int_from_adr(address)
+                if far_pointer:
+                    segment = self.get_int_from_adr(address + 2)
+            elif ':' in target:
+                segment_operand, offset_operand = target.split(':')
+                segment = self.get_int(segment_operand)
+                offset = self.get_int(offset_operand)
+            else:
+                offset = self.get_int(target)
+
+            if self.opcode == 'CALL':
+                if segment is not None:
+                    self.inc_reg('SP', -2)
+                    self.bus.write_word(self.ss_sp, self.read_reg('CS'))
+                self.inc_reg('SP', -2)
+                self.bus.write_word(self.ss_sp, self.read_reg('IP'))
+            if segment is not None:
+                self.write_reg('CS', segment)
+            self.write_reg('IP', offset)
 
         elif self.opcode == 'LOOP':
             self.inc_reg('CX', -1)
@@ -780,24 +673,14 @@ class execution_unit(object):
             if self.reg['CX'] != 0 and self.FR.zero == 0:
                 self.write_reg('IP', self.get_int(self.opd[0]))
 
-        elif self.opcode == 'CALL':
-            if self.opbyte == 4 or ':' in self.opcode[0]:
-                self.inc_reg('SP', -2)
-                self.write_mem(self.ss_sp, self.bus.reg['CS'])
-            self.inc_reg('SP', -2)
-            self.write_mem(self.ss_sp, self.bus.reg['IP'])
-            self.opcode = 'JMP'
-            self.control_circuit()
-
-        elif self.opcode == 'RET':
+        elif self.opcode in ('RET', 'RETF'):
             self.write_reg('IP', self.get_int_from_adr(self.ss_sp))
             self.inc_reg('SP', 2)
-
-        elif self.opcode == 'RETF':
-            self.write_reg('IP', self.get_int_from_adr(self.ss_sp))
-            self.inc_reg('SP', 2)
-            self.write_reg('CS', self.get_int_from_adr(self.ss_sp))
-            self.inc_reg('SP', 2)
+            if self.opcode == 'RETF':
+                self.write_reg('CS', self.get_int_from_adr(self.ss_sp))
+                self.inc_reg('SP', 2)
+            if self.opd:
+                self.inc_reg('SP', self.get_int(self.opd[0]))
 
         elif self.opcode in conditional_jump_ins:
             # All conditional jumps are short jumps
@@ -805,7 +688,7 @@ class execution_unit(object):
                 'JA':  self.FR.carry == 0 and self.FR.zero == 0,
                 'JAE': self.FR.carry == 0,
                 'JB': self.FR.carry == 1,
-                'JBE': self.FR.carry == 0 and self.FR.zero == 1,
+                'JBE': self.FR.carry == 1 or self.FR.zero == 1,
                 'JC': self.FR.carry == 1,
                 'JCXZ': self.reg['CX'] == 0,
                 'JE': self.FR.zero == 1,
@@ -819,7 +702,7 @@ class execution_unit(object):
                 'JNBE': self.FR.carry == 0 and self.FR.zero == 0,
                 'JNC': self.FR.carry == 0,
                 'JNE': self.FR.zero == 0,
-                'JNG': self.FR.zero == 1 and self.FR.sign != self.FR.overflow,
+                'JNG': self.FR.zero == 1 or self.FR.sign != self.FR.overflow,
                 'JNGE': self.FR.sign != self.FR.overflow,
                 'JNL': self.FR.sign == self.FR.overflow,
                 'JNLE': self.FR.sign == self.FR.overflow and self.FR.zero == 0,
@@ -856,8 +739,7 @@ class execution_unit(object):
         elif self.opcode == 'MOVSW':
             src_adr = self.bus.reg['DS'] * 16 + self.reg['SI']
             dst_adr = self.bus.reg['ES'] * 16 + self.reg['DI']
-            res_list = self.bus.read_word(src_adr)
-            self.write_mem(dst_adr, res_list)
+            self.bus.write_word(dst_adr, self.get_int_from_adr(src_adr))
             if self.FR.direction == 0:
                 self.inc_reg('SI', 2)
                 self.inc_reg('DI', 2)
@@ -877,13 +759,7 @@ class execution_unit(object):
             for num in res2_list:
                 res2 = (res2 << 8) + int(num, 16)
 
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+            self._add_subtract(res1, res2, subtract=True)
 
             if self.FR.direction == 0:
                 self.inc_reg('SI', 1)
@@ -904,13 +780,7 @@ class execution_unit(object):
             for num in res2_list:
                 res2 = (res2 << 8) + int(num, 16)
 
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+            self._add_subtract(res1, res2, subtract=True)
 
             if self.FR.direction == 0:
                 self.inc_reg('SI', 2)
@@ -969,13 +839,7 @@ class execution_unit(object):
             for num in res2_list:
                 res2 = (res2 << 8) + int(num, 16)
 
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+            self._add_subtract(res1, res2, subtract=True)
 
             if self.FR.direction == 0:
                 self.inc_reg('DI', 1)
@@ -990,13 +854,7 @@ class execution_unit(object):
             for num in res2_list:
                 res2 = (res2 << 8) + int(num, 16)
 
-            result = (res1 - res2) & int("0x" + "f" * self.opbyte * 2, 16)
-
-            self.set_of(res1 - res2)
-            self.set_cf(self.to_unsigned(res1) < self.to_unsigned(res2))
-            self.set_pf(result)
-            self.set_zf(result)
-            self.set_sf(result)
+            self._add_subtract(res1, res2, subtract=True)
 
             if self.FR.direction == 0:
                 self.inc_reg('DI', 2)
@@ -1233,7 +1091,7 @@ class execution_unit(object):
             self.write_reg('CH', now.hour)
             self.write_reg('CL', now.minute)
             self.write_reg('DH', now.second)
-            self.write_reg('DL', int(now.microsecond * 1e4))
+            self.write_reg('DL', now.microsecond // 10_000)
         
         elif ah == 0x30: # Get DOS Version (AL=major=5, AH=minor=0)
             self.write_reg('AL', 5)
@@ -1473,6 +1331,7 @@ class execution_unit(object):
             self.video.sync_display(force=True)
 
     def interrupt_handler(self, int_type):
+        self.opbyte = 2  # Interrupt stack entries and vector fields are words.
         self.inc_reg('SP', -2) # Save context
         self.write_mem(self.ss_sp, self.FR.get_int())
         self.FR.trap = 0
@@ -1481,7 +1340,6 @@ class execution_unit(object):
         self.write_mem(self.ss_sp, self.get_int('CS'))
         self.inc_reg('SP', -2)
         self.write_mem(self.ss_sp, self.get_int('IP'))
-        self.opbyte = 2
         ip_val = self.get_int_from_adr(int_type * 4)
         cs_val = self.get_int_from_adr(int_type * 4 + 2)
         self.write_reg('IP', ip_val)

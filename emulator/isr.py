@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from emulator.assembler import Assembler
 
 SEG_INIT = {
@@ -23,18 +23,9 @@ def load_isr(memory, verbose=False):
     if verbose:
         print("loading ISR...")
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    routines = Path(__file__).with_name('interrupt_routines')
     for i in ['0', '1', '2', '3', '4', '7c']:
         assembler = Assembler(SEG_INIT)
-        isr_path = os.path.join(base_dir, "tests", "Interrupt", f"isr{i}.asm")
-        if not os.path.exists(isr_path):
-            isr_path = os.path.join(".", "tests", "Interrupt", f"isr{i}.asm")
-        if os.path.exists(isr_path):
-            with open(isr_path, 'r', encoding='utf-8') as file:
-                asm_code = file.read()
-            isr = assembler.compile(asm_code)
-            length = isr.seg_len['CS']
-            base = (int('1000', 16) << 4) + int('100', 16) * int('0x'+i, 16)
-            memory.space[base : base + length] = isr.space['CS'][:length]
-    # print()
-    # memory.space[1000]
+        isr = assembler.compile((routines / f'isr{i}.asm').read_text(encoding='utf-8'))
+        base = (SEG_INIT['CS'] << 4) + 0x100 * int(i, 16)
+        memory.load_segment(base, isr.space['CS'][:isr.seg_len['CS']])

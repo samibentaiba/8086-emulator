@@ -409,8 +409,8 @@ class StepperMotorDevice(object):
                 self.angle = (self.angle - self.DEGREES_PER_STEP) % 360.0
                 self.step_count += 1
                 self.direction_str = "CCW"
-            elif self.prev_coils != coils:
-                # Fallback to CW if non-zero change
+            elif coils and self.prev_coils != coils:
+                # Releasing the coils after a sequence adds no further step.
                 self.angle = (self.angle + self.DEGREES_PER_STEP) % 360.0
                 self.step_count += 1
                 self.direction_str = "CW"

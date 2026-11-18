@@ -2,6 +2,7 @@ import sys
 import queue
 import time
 import pprint
+from emulator.memory import ADDRESS_MASK
 
 class bus_interface_unit(object):
 
@@ -28,14 +29,14 @@ class bus_interface_unit(object):
 
     @property
     def cs_ip(self):
-        return self.reg['CS'] * 16 + self.reg['IP']
+        return ((self.reg['CS'] << 4) + self.reg['IP']) & ADDRESS_MASK
 
     @property
     def cs_pre_ip(self):
-        return self.reg['CS'] * 16 + self.pre_fetch_ip
+        return ((self.reg['CS'] << 4) + self.pre_fetch_ip) & ADDRESS_MASK
 
     def read_byte(self, loc):
-        return self.memory.rb(loc)
+        return self.memory.rb(loc & ADDRESS_MASK)
 
     def read_word(self, loc):
         return self.read_byte(loc + 1) + self.read_byte(loc)
@@ -53,7 +54,7 @@ class bus_interface_unit(object):
             pass
         else:
             sys.exit("Error write_byte")
-        self.memory.wb(loc, content)
+        self.memory.wb(loc & ADDRESS_MASK, content)
 
     def write_word(self, loc, content): # little endian
         if isinstance(content, int):
@@ -102,7 +103,7 @@ class bus_interface_unit(object):
         # Fetch single instruction
         instruction = self.memory.rb(self.cs_pre_ip)
         self.instruction_queue.put(instruction)
-        self.pre_fetch_ip += 1
+        self.pre_fetch_ip = (self.pre_fetch_ip + 1) & 0xffff
         # print("Fetching one ins to pipeline:")
         # pprint.pprint(list(self.instruction_queue.queue))
         # print()

@@ -6,7 +6,8 @@ set "PYTHONPATH=%REPO_DIR%;%PYTHONPATH%"
 python -c "import PyQt5" >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo [8086 GUI] Installing 'PyQt5' for graphical workbench...
-    pip install PyQt5
+    python -m pip install PyQt5
+    if errorlevel 1 exit /b 1
 )
 
 where pythonw >nul 2>nul

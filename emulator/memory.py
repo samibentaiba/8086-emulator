@@ -1,7 +1,8 @@
 import sys
-from emulator.assembler import Assembler
 from emulator.isr import load_isr
 
+MEMORY_SIZE = 1 << 20
+ADDRESS_MASK = MEMORY_SIZE - 1
 
 class Memory(object):
 
@@ -12,11 +13,11 @@ class Memory(object):
         self.write_listener = None
 
     def is_null(self, loc):
-        return self.space[loc] == ['0']
+        return self.rb(loc) == ['0']
 
     def verify(self, loc):
         # Verify valid address
-        if loc < 0 or loc > self.max_space:
+        if loc < 0 or loc >= self.max_space:
             sys.exit(f"Memory Overflow when reading {loc}")
 
     def rb(self, loc):
@@ -31,6 +32,10 @@ class Memory(object):
             self.write_listener(loc, self.space[loc])
         self.space[loc] = content
         
+    def load_segment(self, address, cells):
+        for offset, cell in enumerate(cells):
+            self.wb((address + offset) & ADDRESS_MASK, cell)
+
     def load(self, exe, verbose=False):
         # Program loader
         self.refresh()
@@ -40,7 +45,7 @@ class Memory(object):
             adr = int(exe.seg_adr[seg], 16) * 16
             if verbose:
                 print(hex(adr))
-            self.space[adr: adr + self.seg_size] = val
+            self.load_segment(adr, val[:exe.seg_len[seg]])
             if verbose:
                 print(self.space[adr:adr+100])
         # Load interrupt vector table and interrupt service routines

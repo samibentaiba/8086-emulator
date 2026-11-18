@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 8086 Emulator — Automated Linux & macOS Application Installer
+# 8086 Emulator — Linux application installer
 # Installs CLI launchers (emu8086, emu8086-tui, emu8086-gui) into ~/.local/bin
 # and Desktop Entries into ~/.local/share/applications
 # ==============================================================================
@@ -9,8 +9,9 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${HOME}/.local/bin"
-APPS_DIR="${HOME}/.local/share/applications"
-ICON_DIR="${HOME}/.local/share/icons/hicolor/256x256/apps"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+APPS_DIR="$DATA_DIR/applications"
+ICON_DIR="$DATA_DIR/icons/hicolor/256x256/apps"
 
 echo "======================================================================"
 echo "  Installing 8086 Emulator (TUI & GUI Applications)"
@@ -44,8 +45,14 @@ fi
 
 # 5. Install Desktop Entries
 if [ -d "$REPO_DIR/desktop" ]; then
-    cp "$REPO_DIR/desktop/emu8086-tui.desktop" "$APPS_DIR/"
-    cp "$REPO_DIR/desktop/emu8086-gui.desktop" "$APPS_DIR/"
+    for app in emu8086-tui emu8086-gui; do
+        # Escape the quoted Exec argument, then its backslashes for desktop-file parsing.
+        launcher=$(printf '%s' "$BIN_DIR/$app" | sed 's/["`$\\]/\\&/g; s/\\/\\\\/g; s/%/%%/g')
+        LAUNCHER="$launcher" awk '
+            /^Exec=/ { print "Exec=\"" ENVIRON["LAUNCHER"] "\" %f"; next }
+            { print }
+        ' "$REPO_DIR/desktop/$app.desktop" > "$APPS_DIR/$app.desktop"
+    done
     echo "✓ Desktop applications installed to $APPS_DIR"
 fi
 
@@ -58,7 +65,6 @@ echo ""
 echo "======================================================================"
 echo "  Installation Complete!"
 echo "======================================================================"
-echo "You can now run from ANY terminal:"
 echo "    emu8086-tui                (Open new buffer like Neovim)"
 echo "    emu8086-tui <filename.asm> (Edit & debug assembly file)"
 echo "    emu8086-gui                (Launch desktop GUI)"

@@ -8,13 +8,13 @@ ASSUME CS:CODE
 START:
     ; --- Phase 1: North+South GREEN, East+West RED ---
     ; North=Green(bit2), South=Green(bit8), East=Red(bit9), West=Red(bit3)
-    MOV AX, 0100100100100b  ; N:G=1,W:R=1,S:G=1,E:R=1  => bits 2,3,8,9
+    MOV AX, 030Ch          ; Bits 2, 3, 8, 9
     OUT 4, AX
     MOV CX, 0FFFFh
 DELAY1: LOOP DELAY1
 
     ; --- Phase 2: North+South YELLOW, East+West RED ---
-    MOV AX, 0100010010010b  ; N:Y,W:R,S:Y,E:R
+    MOV AX, 028Ah          ; Bits 1, 3, 7, 9
     OUT 4, AX
     MOV CX, 03FFFh
 DELAY2: LOOP DELAY2
@@ -26,13 +26,13 @@ DELAY2: LOOP DELAY2
 DELAY3: LOOP DELAY3
 
     ; --- Phase 4: East+West GREEN, North+South RED ---
-    MOV AX, 0100100100100b
+    MOV AX, 0861h          ; Bits 0, 5, 6, 11
     OUT 4, AX
     MOV CX, 0FFFFh
 DELAY4: LOOP DELAY4
 
     ; --- Phase 5: East+West YELLOW, North+South RED ---
-    MOV AX, 0100010010010b
+    MOV AX, 0451h          ; Bits 0, 4, 6, 10
     OUT 4, AX
     MOV CX, 03FFFh
 DELAY5: LOOP DELAY5
