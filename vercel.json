@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "public": true,
+
   "rewrites": [
     { "source": "/(.*)", "destination": "/circuits-side/$1" }
   ]
