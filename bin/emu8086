@@ -7,6 +7,13 @@ SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
 export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
 
+# If user passes circuit flag (-c), launch Circuit Atlas
+for arg in "$@"; do
+    if [ "$arg" = "-c" ] || [ "$arg" = "--circuit" ]; then
+        exec python3 "$REPO_DIR/circuit_server.py" "$@"
+    fi
+done
+
 # If user passes CLI-only flags (-n, -i, etc.), dispatch to main.py
 is_cli=0
 for arg in "$@"; do

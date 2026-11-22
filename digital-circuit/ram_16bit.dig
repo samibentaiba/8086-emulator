@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>16-Bit Dual-Bank RAM (Even Bank D7..D0 [A0=0] and Odd Bank D15..D8 [BHE_N=0])</string></entry>
+    <entry><string>Width</string><int>6</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Addr</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>DataIn</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>A0</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>BHE_N</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>WR_N</string></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>CS_N</string></entry></elementAttributes>
+      <pos x="100" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes><entry><string>Label</string><string>Clock</string></entry></elementAttributes>
+      <pos x="100" y="340"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>DataOut</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="100"/>
+    </visualElement>
+
+    <!-- Tunnels -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Addr_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>A0_in</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>BHE_N_in</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WR_N_in</string></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_N_in</string></entry></elementAttributes>
+      <pos x="100" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="100" y="340"/>
+    </visualElement>
+
+    <!-- Split DataIn into Low Byte and High Byte -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="180" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>16</string></entry>
+        <entry><string>Output Splitting</string><string>8,8</string></entry>
+      </elementAttributes>
+      <pos x="200" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="220" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="220" y="420"/>
+    </visualElement>
+
+    <!-- Even Bank Write Enable: ~WR_N & ~CS_N & ~A0 -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WR_N_in</string></entry></elementAttributes>
+      <pos x="180" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="480"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_N_in</string></entry></elementAttributes>
+      <pos x="180" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="500"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>A0_in</string></entry></elementAttributes>
+      <pos x="180" y="520"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="520"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes><entry><string>Inputs</string><int>3</int></entry></elementAttributes>
+      <pos x="260" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>we_even</string></entry></elementAttributes>
+      <pos x="320" y="500"/>
+    </visualElement>
+
+    <!-- Odd Bank Write Enable: ~WR_N & ~CS_N & ~BHE_N -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WR_N_in</string></entry></elementAttributes>
+      <pos x="180" y="580"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="580"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_N_in</string></entry></elementAttributes>
+      <pos x="180" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="600"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>BHE_N_in</string></entry></elementAttributes>
+      <pos x="180" y="620"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="620"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes><entry><string>Inputs</string><int>3</int></entry></elementAttributes>
+      <pos x="260" y="580"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>we_odd</string></entry></elementAttributes>
+      <pos x="320" y="600"/>
+    </visualElement>
+
+    <!-- Even Bank RAM (D7..D0) -->
+    <!-- RAMDualPort: A (pos y=100), Din (y=120), str (y=140), C (y=160), ld (y=180), D (out pos x=460, y=140) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Addr_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="380" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="380" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>we_even</string></entry></elementAttributes>
+      <pos x="380" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="380" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="380" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMDualPort</elementName>
+      <elementAttributes>
+        <entry><string>AddrBits</string><int>16</int></entry>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>Label</string><string>Even_Bank_RAM</string></entry>
+      </elementAttributes>
+      <pos x="400" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="460" y="140"/>
+    </visualElement>
+
+    <!-- Odd Bank RAM (D15..D8) -->
+    <!-- RAMDualPort: A (pos y=240), Din (y=260), str (y=280), C (y=300), ld (y=320), D (out pos x=460, y=280) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Addr_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="380" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="380" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>we_odd</string></entry></elementAttributes>
+      <pos x="380" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="380" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="380" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMDualPort</elementName>
+      <elementAttributes>
+        <entry><string>AddrBits</string><int>16</int></entry>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>Label</string><string>Odd_Bank_RAM</string></entry>
+      </elementAttributes>
+      <pos x="400" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="460" y="280"/>
+    </visualElement>
+
+    <!-- Merge Low Byte and High Byte into DataOut (16 bits) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="560" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="560" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>8,8</string></entry>
+        <entry><string>Output Splitting</string><string>16</string></entry>
+      </elementAttributes>
+      <pos x="580" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="600" y="100"/>
+    </visualElement>
+
+    <!-- Connect to Output -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataOut_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="100"/>
+    </visualElement>
+
+    <!-- Verification Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+Clock Addr   DataIn A0 BHE_N WR_N CS_N DataOut
+# Write full word 0x1234 at addr 0x0100 (A0=0, BHE_N=0, WR_N=0, CS_N=0)
+C     0x0100 0x1234 0  0     0    0    0x1234
+# Read back full word (WR_N=1, CS_N=0)
+0     0x0100 0x0000 0  0     1    0    0x1234
+# Write low byte 0xAA only (A0=0, BHE_N=1) -> word becomes 0x12AA
+C     0x0100 0x00AA 0  1     0    0    0x12AA
+# Read back
+0     0x0100 0x0000 0  0     1    0    0x12AA
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="600" y="400"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <!-- Splitter -->
+    <wire><p1 x="180" y="400"/><p2 x="200" y="400"/></wire>
+    <!-- We even logic: 3-in AND at (260, 480) -> In_1(260, 480), In_2(260, 500), In_3(260, 520), out(320, 500) -->
+    <wire><p1 x="180" y="480"/><p2 x="200" y="480"/></wire>
+    <wire><p1 x="180" y="500"/><p2 x="200" y="500"/></wire>
+    <wire><p1 x="180" y="520"/><p2 x="200" y="520"/></wire>
+    <wire><p1 x="240" y="480"/><p2 x="260" y="480"/></wire>
+    <wire><p1 x="240" y="500"/><p2 x="260" y="500"/></wire>
+    <wire><p1 x="240" y="520"/><p2 x="260" y="520"/></wire>
+
+    <!-- We odd logic: 3-in AND at (260, 580) -> In_1(260, 580), In_2(260, 600), In_3(260, 620), out(320, 600) -->
+    <wire><p1 x="180" y="580"/><p2 x="200" y="580"/></wire>
+    <wire><p1 x="180" y="600"/><p2 x="200" y="600"/></wire>
+    <wire><p1 x="180" y="620"/><p2 x="200" y="620"/></wire>
+    <wire><p1 x="240" y="580"/><p2 x="260" y="580"/></wire>
+    <wire><p1 x="240" y="600"/><p2 x="260" y="600"/></wire>
+    <wire><p1 x="240" y="620"/><p2 x="260" y="620"/></wire>
+
+    <!-- Even RAM inputs -->
+    <wire><p1 x="380" y="100"/><p2 x="400" y="100"/></wire>
+    <wire><p1 x="380" y="120"/><p2 x="400" y="120"/></wire>
+    <wire><p1 x="380" y="140"/><p2 x="400" y="140"/></wire>
+    <wire><p1 x="380" y="160"/><p2 x="400" y="160"/></wire>
+    <wire><p1 x="380" y="180"/><p2 x="400" y="180"/></wire>
+
+    <!-- Odd RAM inputs -->
+    <wire><p1 x="380" y="240"/><p2 x="400" y="240"/></wire>
+    <wire><p1 x="380" y="260"/><p2 x="400" y="260"/></wire>
+    <wire><p1 x="380" y="280"/><p2 x="400" y="280"/></wire>
+    <wire><p1 x="380" y="300"/><p2 x="400" y="300"/></wire>
+    <wire><p1 x="380" y="320"/><p2 x="400" y="320"/></wire>
+
+    <!-- Merger Splitter at (580, 100): 0-7 at (580, 100), 8-15 at (580, 120), out at (600, 100) -->
+    <wire><p1 x="560" y="100"/><p2 x="580" y="100"/></wire>
+    <wire><p1 x="560" y="120"/><p2 x="580" y="120"/></wire>
+
+    <!-- Out -->
+    <wire><p1 x="780" y="100"/><p2 x="800" y="100"/></wire>
+  </wires>
+</circuit>

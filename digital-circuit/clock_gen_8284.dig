@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>Intel 8284A Clock Generator &amp; Driver (Divide-by-3 33% Duty Cycle CLK, RESET &amp; READY Synchronizers)</string></entry>
+    <entry><string>Width</string><int>5</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>OSC</string></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>RES_N</string></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>RDY_IN</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>CLK</string></entry></elementAttributes>
+      <pos x="700" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>RESET</string></entry></elementAttributes>
+      <pos x="700" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>READY</string></entry></elementAttributes>
+      <pos x="700" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>PCLK</string></entry></elementAttributes>
+      <pos x="700" y="220"/>
+    </visualElement>
+
+    <!-- Tunnels -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OSC_in</string></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RES_N_in</string></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RDY_in_net</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+
+    <!-- Divide-by-3 Counter: states 0, 1, 2
+         CLK is HIGH during state 0, LOW during states 1 and 2 (33.3% duty cycle) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OSC_in</string></entry></elementAttributes>
+      <pos x="180" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Counter</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>2</int></entry>
+        <entry><string>max</string><int>2</int></entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+    <!-- Counter en (x+200, y+120) tied to 1 -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="180" y="120"/>
+    </visualElement>
+    <!-- Counter clr (x+200, y+140) tied to 0 -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="180" y="140"/>
+    </visualElement>
+
+    <!-- State comparator: CLK = (Count == 0) -->
+    <visualElement>
+      <elementName>Comparator</elementName>
+      <elementAttributes><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="280" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK_net</string></entry></elementAttributes>
+      <pos x="380" y="120"/>
+    </visualElement>
+
+    <!-- RESET Synchronizer: Inverts RES_N and synchronizes with CLK falling edge -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RES_N_in</string></entry></elementAttributes>
+      <pos x="180" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes/>
+      <pos x="200" y="240"/>
+    </visualElement>
+    <!-- D-FF for RESET sync -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OSC_in</string></entry></elementAttributes>
+      <pos x="240" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>D_FF</elementName>
+      <elementAttributes/>
+      <pos x="260" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RESET_net</string></entry></elementAttributes>
+      <pos x="340" y="240"/>
+    </visualElement>
+
+    <!-- READY Synchronizer: D-FF on CLK -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RDY_in_net</string></entry></elementAttributes>
+      <pos x="180" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK_net</string></entry></elementAttributes>
+      <pos x="180" y="340"/>
+    </visualElement>
+    <visualElement>
+      <elementName>D_FF</elementName>
+      <elementAttributes/>
+      <pos x="200" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>READY_net</string></entry></elementAttributes>
+      <pos x="280" y="320"/>
+    </visualElement>
+
+    <!-- PCLK Divider: /2 on CLK -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK_net</string></entry></elementAttributes>
+      <pos x="180" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>T_FF</elementName>
+      <elementAttributes/>
+      <pos x="200" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="180" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>PCLK_net</string></entry></elementAttributes>
+      <pos x="280" y="400"/>
+    </visualElement>
+
+    <!-- Connect Outputs -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK_net</string></entry></elementAttributes>
+      <pos x="680" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RESET_net</string></entry></elementAttributes>
+      <pos x="680" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>READY_net</string></entry></elementAttributes>
+      <pos x="680" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>PCLK_net</string></entry></elementAttributes>
+      <pos x="680" y="220"/>
+    </visualElement>
+
+    <!-- Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+OSC RES_N RDY_IN CLK RESET READY
+# Power on: RES_N = 0 (reset active)
+C   0     1      1   1     1
+C   0     1      0   1     1
+C   0     1      0   1     1
+# Normal running: RES_N = 1 (reset cleared)
+C   1     1      1   0     1
+C   1     1      0   0     1
+C   1     1      0   0     1
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="500" y="340"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <!-- Counter wires -->
+    <wire><p1 x="180" y="100"/><p2 x="200" y="100"/></wire>
+    <wire><p1 x="180" y="120"/><p2 x="200" y="120"/></wire>
+    <wire><p1 x="180" y="140"/><p2 x="200" y="140"/></wire>
+    <wire><p1 x="260" y="100"/><p2 x="300" y="100"/></wire>
+    <wire><p1 x="280" y="120"/><p2 x="300" y="120"/></wire>
+    <wire><p1 x="360" y="120"/><p2 x="380" y="120"/></wire>
+    <!-- RESET sync -->
+    <wire><p1 x="180" y="240"/><p2 x="200" y="240"/></wire>
+    <wire><p1 x="240" y="240"/><p2 x="260" y="240"/></wire>
+    <wire><p1 x="240" y="260"/><p2 x="260" y="260"/></wire>
+    <wire><p1 x="320" y="240"/><p2 x="340" y="240"/></wire>
+    <!-- READY sync -->
+    <wire><p1 x="180" y="320"/><p2 x="200" y="320"/></wire>
+    <wire><p1 x="180" y="340"/><p2 x="200" y="340"/></wire>
+    <wire><p1 x="260" y="320"/><p2 x="280" y="320"/></wire>
+    <!-- PCLK divider -->
+    <wire><p1 x="180" y="400"/><p2 x="200" y="400"/></wire>
+    <wire><p1 x="180" y="420"/><p2 x="200" y="420"/></wire>
+    <wire><p1 x="260" y="400"/><p2 x="280" y="400"/></wire>
+    <!-- Outputs -->
+    <wire><p1 x="680" y="100"/><p2 x="700" y="100"/></wire>
+    <wire><p1 x="680" y="140"/><p2 x="700" y="140"/></wire>
+    <wire><p1 x="680" y="180"/><p2 x="700" y="180"/></wire>
+    <wire><p1 x="680" y="220"/><p2 x="700" y="220"/></wire>
+  </wires>
+</circuit>

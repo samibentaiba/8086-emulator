@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=8086 Digital Logic Workbench
+GenericName=Intel 8086 Complete Digital Circuit
+Comment=100% gate-level electrical circuit simulation of Intel 8086 microprocessor system in Digital
+Exec=emu8086-digital
+Terminal=false
+Icon=emu8086
+Categories=Development;Education;Electronics;Engineering;
+Keywords=8086;digital;circuit;schematic;cpu;microprocessor;gates;simulation;
+StartupNotify=true

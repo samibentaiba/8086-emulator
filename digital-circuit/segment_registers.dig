@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>8086 Segment Registers (CS, DS, SS, ES) and 20-Bit Physical Base Address Generator</string></entry>
+    <entry><string>Width</string><int>6</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>DataIn</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SegSel</string></entry>
+        <entry><string>Bits</string><int>2</int></entry>
+      </elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SegWr</string></entry>
+      </elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Clock</string></entry>
+      </elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SegOut</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Base20</string></entry>
+        <entry><string>Bits</string><int>20</int></entry>
+      </elementAttributes>
+      <pos x="800" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>CS</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>DS</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SS</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>ES</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="800" y="300"/>
+    </visualElement>
+
+    <!-- Input Tunnels -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegSel_bus</string></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegWr_in</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+
+    <!-- 2-to-4 Decoder for Segment Selection -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegSel_bus</string></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="140" y="380"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Decoder</elementName>
+      <elementAttributes><entry><string>Selector Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="120" y="320"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_0</string></entry></elementAttributes>
+      <pos x="160" y="320"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_1</string></entry></elementAttributes>
+      <pos x="160" y="340"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_2</string></entry></elementAttributes>
+      <pos x="160" y="360"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_3</string></entry></elementAttributes>
+      <pos x="160" y="380"/>
+    </visualElement>
+
+    <!-- CS Register -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_0</string></entry></elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegWr_in</string></entry></elementAttributes>
+      <pos x="300" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes/>
+      <pos x="320" y="100"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="400" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>16</int></entry>
+        <entry><string>Label</string><string>CS</string></entry>
+      </elementAttributes>
+      <pos x="420" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="120"/>
+    </visualElement>
+
+    <!-- DS Register -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_1</string></entry></elementAttributes>
+      <pos x="300" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegWr_in</string></entry></elementAttributes>
+      <pos x="300" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes/>
+      <pos x="320" y="200"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="400" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>16</int></entry>
+        <entry><string>Label</string><string>DS</string></entry>
+      </elementAttributes>
+      <pos x="420" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="220"/>
+    </visualElement>
+
+    <!-- SS Register -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_2</string></entry></elementAttributes>
+      <pos x="300" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegWr_in</string></entry></elementAttributes>
+      <pos x="300" y="340"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes/>
+      <pos x="320" y="300"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="400" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>16</int></entry>
+        <entry><string>Label</string><string>SS</string></entry>
+      </elementAttributes>
+      <pos x="420" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="320"/>
+    </visualElement>
+
+    <!-- ES Register -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>sel_3</string></entry></elementAttributes>
+      <pos x="300" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegWr_in</string></entry></elementAttributes>
+      <pos x="300" y="440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes/>
+      <pos x="320" y="400"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="400" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>16</int></entry>
+        <entry><string>Label</string><string>ES</string></entry>
+      </elementAttributes>
+      <pos x="420" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ES_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="420"/>
+    </visualElement>
+
+    <!-- 4:1 Multiplexer for SegOut -->
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>16</int></entry>
+        <entry><string>Selector Bits</string><int>2</int></entry>
+      </elementAttributes>
+      <pos x="560" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegSel_bus</string></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="580" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegOut_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="620" y="140"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="520" y="100"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="520" y="120"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="520" y="140"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ES_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="520" y="160"/>
+    </visualElement>
+
+    <!-- Base20 Generator: SegOut &lt;&lt; 4 -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+        <entry><string>Value</string><int>0</int></entry>
+        <entry><string>Bits</string><int>4</int></entry>
+      </elementAttributes>
+      <pos x="560" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegOut_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="560" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>4,16</string></entry>
+        <entry><string>Output Splitting</string><string>20</string></entry>
+      </elementAttributes>
+      <pos x="600" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Base20_net</string></entry><entry><string>Bits</string><int>20</int></entry></elementAttributes>
+      <pos x="640" y="260"/>
+    </visualElement>
+
+    <!-- Outputs -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SegOut_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Base20_net</string></entry><entry><string>Bits</string><int>20</int></entry></elementAttributes>
+      <pos x="780" y="140"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="180"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="220"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SS_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="260"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ES_val</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="780" y="300"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+Clock DataIn SegSel SegWr SegOut Base20
+# Write CS = 0x1000 -> Base20 = 0x10000
+C     0x1000 0      1     0x1000 0x10000
+# Write DS = 0x2000 -> Base20 = 0x20000
+C     0x2000 1      1     0x2000 0x20000
+# Write SS = 0x5000 -> Base20 = 0x50000
+C     0x5000 2      1     0x5000 0x50000
+# Write ES = 0x7000 -> Base20 = 0x70000
+C     0x7000 3      1     0x7000 0x70000
+# Read back CS (SegSel=0) with SegWr=0
+0     0x0000 0      0     0x1000 0x10000
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="700" y="440"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="300" y="100"/><p2 x="320" y="100"/></wire>
+    <wire><p1 x="300" y="140"/><p2 x="320" y="140"/></wire>
+    <wire><p1 x="380" y="120"/><p2 x="420" y="140"/></wire>
+    <wire><p1 x="400" y="100"/><p2 x="420" y="100"/></wire>
+    <wire><p1 x="400" y="120"/><p2 x="420" y="120"/></wire>
+    <wire><p1 x="480" y="120"/><p2 x="500" y="120"/></wire>
+    <wire><p1 x="300" y="200"/><p2 x="320" y="200"/></wire>
+    <wire><p1 x="300" y="240"/><p2 x="320" y="240"/></wire>
+    <wire><p1 x="380" y="220"/><p2 x="420" y="240"/></wire>
+    <wire><p1 x="400" y="200"/><p2 x="420" y="200"/></wire>
+    <wire><p1 x="400" y="220"/><p2 x="420" y="220"/></wire>
+    <wire><p1 x="480" y="220"/><p2 x="500" y="220"/></wire>
+    <wire><p1 x="300" y="300"/><p2 x="320" y="300"/></wire>
+    <wire><p1 x="300" y="340"/><p2 x="320" y="340"/></wire>
+    <wire><p1 x="380" y="320"/><p2 x="420" y="340"/></wire>
+    <wire><p1 x="400" y="300"/><p2 x="420" y="300"/></wire>
+    <wire><p1 x="400" y="320"/><p2 x="420" y="320"/></wire>
+    <wire><p1 x="480" y="320"/><p2 x="500" y="320"/></wire>
+    <wire><p1 x="300" y="400"/><p2 x="320" y="400"/></wire>
+    <wire><p1 x="300" y="440"/><p2 x="320" y="440"/></wire>
+    <wire><p1 x="380" y="420"/><p2 x="420" y="440"/></wire>
+    <wire><p1 x="400" y="400"/><p2 x="420" y="400"/></wire>
+    <wire><p1 x="400" y="420"/><p2 x="420" y="420"/></wire>
+    <wire><p1 x="480" y="420"/><p2 x="500" y="420"/></wire>
+    <wire><p1 x="600" y="140"/><p2 x="620" y="140"/></wire>
+    <wire><p1 x="520" y="100"/><p2 x="560" y="100"/></wire>
+    <wire><p1 x="520" y="120"/><p2 x="560" y="120"/></wire>
+    <wire><p1 x="520" y="140"/><p2 x="560" y="140"/></wire>
+    <wire><p1 x="520" y="160"/><p2 x="560" y="160"/></wire>
+    <wire><p1 x="560" y="260"/><p2 x="600" y="260"/></wire>
+    <wire><p1 x="560" y="280"/><p2 x="600" y="280"/></wire>
+    <wire><p1 x="620" y="260"/><p2 x="640" y="260"/></wire>
+    <wire><p1 x="780" y="100"/><p2 x="800" y="100"/></wire>
+    <wire><p1 x="780" y="140"/><p2 x="800" y="140"/></wire>
+    <wire><p1 x="780" y="180"/><p2 x="800" y="180"/></wire>
+    <wire><p1 x="780" y="220"/><p2 x="800" y="220"/></wire>
+    <wire><p1 x="780" y="260"/><p2 x="800" y="260"/></wire>
+    <wire><p1 x="780" y="300"/><p2 x="800" y="300"/></wire>
+  </wires>
+</circuit>

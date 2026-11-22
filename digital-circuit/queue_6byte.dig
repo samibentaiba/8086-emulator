@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>8086 6-Byte Instruction Prefetch FIFO Queue</string></entry>
+    <entry><string>Width</string><int>5</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>ByteIn</string></entry>
+        <entry><string>Bits</string><int>8</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>Push</string></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>Pop</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>Flush</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes><entry><string>Label</string><string>Clock</string></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Opcode</string></entry>
+        <entry><string>Bits</string><int>8</int></entry>
+      </elementAttributes>
+      <pos x="800" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>Empty</string></entry></elementAttributes>
+      <pos x="800" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>Full</string></entry></elementAttributes>
+      <pos x="800" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Count</string></entry>
+        <entry><string>Bits</string><int>3</int></entry>
+      </elementAttributes>
+      <pos x="800" y="220"/>
+    </visualElement>
+
+    <!-- Input Tunnels -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ByteIn_bus</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Push_in</string></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Pop_in</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Flush_in</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+
+    <!-- Up/Down Counter for Count (3 bits: 0 to 6) -->
+    <!-- Add Count + 1 on Push, Count - 1 on Pop -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="200" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Add</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="220" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="200" y="140"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="200" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="200" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Sub</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="220" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="200" y="220"/>
+    </visualElement>
+
+    <!-- Next Count MUX:
+         if Flush then 0
+         else if Push & !Pop then Count + 1
+         else if Pop & !Push then Count - 1
+         else Count -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="320" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="340" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Push_in</string></entry></elementAttributes>
+      <pos x="360" y="140"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="420" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Pop_in</string></entry></elementAttributes>
+      <pos x="440" y="160"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="480" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="500" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Flush_in</string></entry></elementAttributes>
+      <pos x="520" y="180"/>
+    </visualElement>
+
+    <!-- Count enable: Push | Pop | Flush -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Push_in</string></entry></elementAttributes>
+      <pos x="420" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Pop_in</string></entry></elementAttributes>
+      <pos x="420" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Flush_in</string></entry></elementAttributes>
+      <pos x="420" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Or</elementName>
+      <elementAttributes><entry><string>Inputs</string><int>3</int></entry></elementAttributes>
+      <pos x="440" y="240"/>
+    </visualElement>
+
+    <!-- Count Register -->
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>3</int></entry>
+        <entry><string>Label</string><string>QueueCount</string></entry>
+      </elementAttributes>
+      <pos x="580" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="560" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="660" y="180"/>
+    </visualElement>
+
+    <!-- Empty flag: Count == 0 -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="660" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Comparator</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="680" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="660" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Empty_net</string></entry></elementAttributes>
+      <pos x="760" y="260"/>
+    </visualElement>
+
+    <!-- Full flag: Count == 6 -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="660" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Comparator</elementName>
+      <elementAttributes><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="680" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>6</int></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="660" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Full_net</string></entry></elementAttributes>
+      <pos x="760" y="320"/>
+    </visualElement>
+
+    <!-- Q0 Register (Head / Opcode) -->
+    <!-- When Push: if Count==0 then Q0 loads ByteIn -->
+    <!-- When Pop: Q0 loads Q1 -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ByteIn_bus</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="200" y="380"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Q1_val</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="200" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="220" y="380"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Pop_in</string></entry></elementAttributes>
+      <pos x="240" y="420"/>
+    </visualElement>
+
+    <!-- Q0 Enable: (Push & Empty) | Pop | Flush -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Push_in</string></entry></elementAttributes>
+      <pos x="200" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Empty_net</string></entry></elementAttributes>
+      <pos x="200" y="520"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes/>
+      <pos x="220" y="480"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Pop_in</string></entry></elementAttributes>
+      <pos x="300" y="520"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Or</elementName>
+      <elementAttributes/>
+      <pos x="320" y="500"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>Label</string><string>Q0</string></entry>
+      </elementAttributes>
+      <pos x="420" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Q0_val</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="500" y="420"/>
+    </visualElement>
+
+    <!-- Q1 Register -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>ByteIn_bus</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="400" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="400" y="520"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Push_in</string></entry></elementAttributes>
+      <pos x="400" y="540"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>Label</string><string>Q1</string></entry>
+      </elementAttributes>
+      <pos x="420" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Q1_val</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="500" y="520"/>
+    </visualElement>
+
+    <!-- Connect to Outputs -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Q0_val</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="780" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Empty_net</string></entry></elementAttributes>
+      <pos x="780" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Full_net</string></entry></elementAttributes>
+      <pos x="780" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Count_val</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="780" y="220"/>
+    </visualElement>
+
+    <!-- Verification Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+Clock Flush Push Pop ByteIn Opcode Empty Full Count
+# Step 1: Initial flush -> Empty=1, Count=0
+C     1     0    0   0x00   0x00   1     0    0
+# Step 2: Push opcode 0x90 (NOP) -> Count=1, Empty=0, Opcode=0x90
+C     0     1    0   0x90   0x90   0     0    1
+# Step 3: Push opcode 0xB8 (MOV AX) -> Count=2
+C     0     1    0   0xB8   0x90   0     0    2
+# Step 4: Pop first instruction (0x90) -> Opcode becomes 0xB8, Count=1
+C     0     0    1   0x00   0xB8   0     0    1
+# Step 5: Flush
+C     1     0    0   0x00   0x00   1     0    0
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="600" y="600"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <!-- Adder / Subtractor wires -->
+    <wire><p1 x="200" y="100"/><p2 x="220" y="100"/></wire>
+    <wire><p1 x="200" y="120"/><p2 x="220" y="120"/></wire>
+    <wire><p1 x="200" y="140"/><p2 x="220" y="140"/></wire>
+    <wire><p1 x="200" y="180"/><p2 x="220" y="180"/></wire>
+    <wire><p1 x="200" y="200"/><p2 x="220" y="200"/></wire>
+    <wire><p1 x="200" y="220"/><p2 x="220" y="220"/></wire>
+    <!-- Next Count Muxes -->
+    <wire><p1 x="280" y="100"/><p2 x="300" y="100"/></wire>
+    <wire><p1 x="300" y="100"/><p2 x="300" y="140"/></wire>
+    <wire><p1 x="300" y="140"/><p2 x="340" y="140"/></wire>
+    <wire><p1 x="320" y="100"/><p2 x="340" y="100"/></wire>
+    <wire><p1 x="380" y="120"/><p2 x="420" y="120"/></wire>
+    <wire><p1 x="280" y="180"/><p2 x="400" y="180"/></wire>
+    <wire><p1 x="400" y="180"/><p2 x="400" y="160"/></wire>
+    <wire><p1 x="400" y="160"/><p2 x="420" y="160"/></wire>
+    <wire><p1 x="460" y="140"/><p2 x="500" y="140"/></wire>
+    <wire><p1 x="480" y="180"/><p2 x="500" y="180"/></wire>
+    <wire><p1 x="540" y="160"/><p2 x="580" y="160"/></wire>
+    <!-- OR gate inputs -->
+    <wire><p1 x="420" y="240"/><p2 x="440" y="240"/></wire>
+    <wire><p1 x="420" y="260"/><p2 x="440" y="260"/></wire>
+    <wire><p1 x="420" y="280"/><p2 x="440" y="280"/></wire>
+    <!-- OR to Reg en at (580, 200) -->
+    <wire><p1 x="500" y="260"/><p2 x="560" y="260"/></wire>
+    <wire><p1 x="560" y="260"/><p2 x="560" y="200"/></wire>
+    <wire><p1 x="560" y="200"/><p2 x="580" y="200"/></wire>
+    <!-- Reg Clock -->
+    <wire><p1 x="560" y="180"/><p2 x="580" y="180"/></wire>
+    <wire><p1 x="640" y="180"/><p2 x="660" y="180"/></wire>
+    <!-- Comparators -->
+    <wire><p1 x="660" y="240"/><p2 x="680" y="240"/></wire>
+    <wire><p1 x="660" y="260"/><p2 x="680" y="260"/></wire>
+    <wire><p1 x="740" y="260"/><p2 x="760" y="260"/></wire>
+    <wire><p1 x="660" y="300"/><p2 x="680" y="300"/></wire>
+    <wire><p1 x="660" y="320"/><p2 x="680" y="320"/></wire>
+    <wire><p1 x="740" y="320"/><p2 x="760" y="320"/></wire>
+    <!-- Q0 logic -->
+    <wire><p1 x="200" y="380"/><p2 x="220" y="380"/></wire>
+    <wire><p1 x="200" y="420"/><p2 x="220" y="420"/></wire>
+    <wire><p1 x="260" y="400"/><p2 x="420" y="400"/></wire>
+    <wire><p1 x="200" y="480"/><p2 x="220" y="480"/></wire>
+    <wire><p1 x="200" y="520"/><p2 x="220" y="520"/></wire>
+    <wire><p1 x="280" y="500"/><p2 x="320" y="500"/></wire>
+    <wire><p1 x="300" y="520"/><p2 x="300" y="540"/></wire>
+    <wire><p1 x="300" y="540"/><p2 x="320" y="540"/></wire>
+    <wire><p1 x="380" y="520"/><p2 x="400" y="520"/></wire>
+    <wire><p1 x="400" y="520"/><p2 x="400" y="440"/></wire>
+    <wire><p1 x="400" y="440"/><p2 x="420" y="440"/></wire>
+    <wire><p1 x="400" y="420"/><p2 x="420" y="420"/></wire>
+    <wire><p1 x="480" y="420"/><p2 x="500" y="420"/></wire>
+    <!-- Q1 logic -->
+    <wire><p1 x="400" y="500"/><p2 x="420" y="500"/></wire>
+    <wire><p1 x="400" y="520"/><p2 x="420" y="520"/></wire>
+    <wire><p1 x="400" y="540"/><p2 x="420" y="540"/></wire>
+    <wire><p1 x="480" y="520"/><p2 x="500" y="520"/></wire>
+    <!-- Outputs -->
+    <wire><p1 x="780" y="100"/><p2 x="800" y="100"/></wire>
+    <wire><p1 x="780" y="140"/><p2 x="800" y="140"/></wire>
+    <wire><p1 x="780" y="180"/><p2 x="800" y="180"/></wire>
+    <wire><p1 x="780" y="220"/><p2 x="800" y="220"/></wire>
+  </wires>
+</circuit>

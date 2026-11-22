@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# 8086 Circuit Atlas Workbench Launcher
+# Launches the interactive Intel 8086 circuit schematic in your browser.
+
+set -e
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
+
+exec python3 "$REPO_DIR/circuit_server.py" "$@"

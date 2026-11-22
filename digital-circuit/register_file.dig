@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>Dual-Port 16-Bit General Purpose Registers (AX, CX, DX, BX, SP, BP, SI, DI) with Byte-Level Write Masking</string></entry>
+    <entry><string>Width</string><int>6</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>DataIn</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>RegWr</string></entry>
+        <entry><string>Bits</string><int>3</int></entry>
+      </elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>WrHigh</string></entry>
+      </elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>WrLow</string></entry>
+      </elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SelA</string></entry>
+        <entry><string>Bits</string><int>3</int></entry>
+      </elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>SelB</string></entry>
+        <entry><string>Bits</string><int>3</int></entry>
+      </elementAttributes>
+      <pos x="100" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Clock</string></entry>
+      </elementAttributes>
+      <pos x="100" y="340"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>OutA</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="700" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>OutB</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="700" y="140"/>
+    </visualElement>
+
+    <!-- Tunnels for inputs -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RegWr_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WrHigh_in</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WrLow_in</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelA_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelB_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="100" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="100" y="340"/>
+    </visualElement>
+
+    <!-- Split DataIn into High Byte (15:8) and Low Byte (7:0) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_bus</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="100" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>16</string></entry>
+        <entry><string>Output Splitting</string><string>8,8</string></entry>
+      </elementAttributes>
+      <pos x="120" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="140" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="140" y="440"/>
+    </visualElement>
+
+    <!-- High Byte Register File (8 bits, 8 registers) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="240" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WrHigh_in</string></entry></elementAttributes>
+      <pos x="240" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RegWr_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="240" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelA_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelB_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="200"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>RegisterFile</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>AddrBits</string><int>3</int></entry>
+        <entry><string>Label</string><string>Regs_High</string></entry>
+      </elementAttributes>
+      <pos x="260" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Da_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="360" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Db_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="360" y="120"/>
+    </visualElement>
+
+    <!-- Low Byte Register File (8 bits, 8 registers) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>DataIn_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="240" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>WrLow_in</string></entry></elementAttributes>
+      <pos x="240" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>RegWr_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>CLK</string></entry></elementAttributes>
+      <pos x="240" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelA_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="340"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>SelB_bus</string></entry><entry><string>Bits</string><int>3</int></entry></elementAttributes>
+      <pos x="240" y="360"/>
+    </visualElement>
+
+    <visualElement>
+      <elementName>RegisterFile</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>8</int></entry>
+        <entry><string>AddrBits</string><int>3</int></entry>
+        <entry><string>Label</string><string>Regs_Low</string></entry>
+      </elementAttributes>
+      <pos x="260" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Da_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="360" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Db_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="360" y="280"/>
+    </visualElement>
+
+    <!-- Merge Port A: Da_L (7:0) and Da_H (15:8) into OutA (16-bit) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Da_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="440" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Da_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="440" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>8,8</string></entry>
+        <entry><string>Output Splitting</string><string>16</string></entry>
+      </elementAttributes>
+      <pos x="460" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OutA_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="100"/>
+    </visualElement>
+
+    <!-- Merge Port B: Db_L (7:0) and Db_H (15:8) into OutB (16-bit) -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Db_L</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="440" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>Db_H</string></entry><entry><string>Bits</string><int>8</int></entry></elementAttributes>
+      <pos x="440" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>8,8</string></entry>
+        <entry><string>Output Splitting</string><string>16</string></entry>
+      </elementAttributes>
+      <pos x="460" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OutB_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="500" y="180"/>
+    </visualElement>
+
+    <!-- Output Tunnels -->
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OutA_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="680" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes><entry><string>NetName</string><string>OutB_net</string></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="680" y="140"/>
+    </visualElement>
+
+    <!-- Verification Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+Clock DataIn RegWr WrHigh WrLow SelA SelB OutA   OutB
+# Step 1: Write 0x1234 to AX (RegWr=0)
+C     0x1234 0     1      1     0    0    0x1234 0x1234
+# Step 2: Write 0x5678 to BX (RegWr=3)
+C     0x5678 3     1      1     0    3    0x1234 0x5678
+# Step 3: Write low byte 0xAA to AL (RegWr=0, WrHigh=0, WrLow=1, DataIn=0x00AA) -> AX becomes 0x12AA
+C     0x00AA 0     0      1     0    3    0x12AA 0x5678
+# Step 4: Write high byte 0xBB to AH (RegWr=0, WrHigh=1, WrLow=0, DataIn=0xBB00) -> AX becomes 0xBBAA
+C     0xBB00 0     1      0     0    3    0xBBAA 0x5678
+# Step 5: Read CX (SelA=1) and DX (SelB=2)
+0     0x0000 0     0      0     1    2    0x0000 0x0000
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="600" y="300"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <!-- Splitter DataIn -->
+    <wire><p1 x="100" y="420"/><p2 x="120" y="420"/></wire>
+    <!-- Regs_High Inputs -->
+    <wire><p1 x="240" y="100"/><p2 x="260" y="100"/></wire>
+    <wire><p1 x="240" y="120"/><p2 x="260" y="120"/></wire>
+    <wire><p1 x="240" y="140"/><p2 x="260" y="140"/></wire>
+    <wire><p1 x="240" y="160"/><p2 x="260" y="160"/></wire>
+    <wire><p1 x="240" y="180"/><p2 x="260" y="180"/></wire>
+    <wire><p1 x="240" y="200"/><p2 x="260" y="200"/></wire>
+    <!-- Regs_High Outputs (width 80 -> x=340) -->
+    <wire><p1 x="340" y="100"/><p2 x="360" y="100"/></wire>
+    <wire><p1 x="340" y="120"/><p2 x="360" y="120"/></wire>
+    <!-- Regs_Low Inputs -->
+    <wire><p1 x="240" y="260"/><p2 x="260" y="260"/></wire>
+    <wire><p1 x="240" y="280"/><p2 x="260" y="280"/></wire>
+    <wire><p1 x="240" y="300"/><p2 x="260" y="300"/></wire>
+    <wire><p1 x="240" y="320"/><p2 x="260" y="320"/></wire>
+    <wire><p1 x="240" y="340"/><p2 x="260" y="340"/></wire>
+    <wire><p1 x="240" y="360"/><p2 x="260" y="360"/></wire>
+    <!-- Regs_Low Outputs -->
+    <wire><p1 x="340" y="260"/><p2 x="360" y="260"/></wire>
+    <wire><p1 x="340" y="280"/><p2 x="360" y="280"/></wire>
+    <!-- OutA Merger -->
+    <wire><p1 x="440" y="100"/><p2 x="460" y="100"/></wire>
+    <wire><p1 x="440" y="120"/><p2 x="460" y="120"/></wire>
+    <wire><p1 x="480" y="100"/><p2 x="500" y="100"/></wire>
+    <!-- OutB Merger -->
+    <wire><p1 x="440" y="180"/><p2 x="460" y="180"/></wire>
+    <wire><p1 x="440" y="200"/><p2 x="460" y="200"/></wire>
+    <wire><p1 x="480" y="180"/><p2 x="500" y="180"/></wire>
+    <!-- Outputs -->
+    <wire><p1 x="680" y="100"/><p2 x="700" y="100"/></wire>
+    <wire><p1 x="680" y="140"/><p2 x="700" y="140"/></wire>
+  </wires>
+</circuit>

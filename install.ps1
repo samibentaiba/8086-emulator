@@ -67,12 +67,22 @@ if (-not $NoShortcuts) {
     $s2.Description = "8086 Emulator - PyQt5 Desktop GUI Workbench"
     $s2.Save()
     Write-Host "[OK] Created Desktop Shortcut: $guiLnk" -ForegroundColor Green
+
+    $circuitBat = Join-Path $BinDir "emu8086-circuit.bat"
+    $circuitLnk = Join-Path $Desktop "8086 Circuit Atlas.lnk"
+    $s3 = $ws.CreateShortcut($circuitLnk)
+    $s3.TargetPath = $circuitBat
+    $s3.WorkingDirectory = $RepoDir
+    $s3.Description = "8086 Circuit Atlas - Interactive Hardware Schematic"
+    $s3.Save()
+    Write-Host "[OK] Created Desktop Shortcut: $circuitLnk" -ForegroundColor Green
 }
 
 Write-Host "`n======================================================================" -ForegroundColor Cyan
 Write-Host "  Installation Complete!" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "Available commands in any new terminal:"
-Write-Host "  - emu8086-tui [file.asm]   (Neovim-style terminal debugger & editor)"
-Write-Host "  - emu8086-gui [file.asm]   (PyQt5 graphical microprocessor workbench)"
-Write-Host "  - emu8086     [options]    (Unified CLI & headless test runner)"
+Write-Host "  - emu8086-tui     [file.asm] (Neovim-style terminal debugger & editor)"
+Write-Host "  - emu8086-gui     [file.asm] (PyQt5 graphical microprocessor workbench)"
+Write-Host "  - emu8086-circuit            (8086 Circuit Atlas interactive schematic)"
+Write-Host "  - emu8086         [options]  (Unified CLI & headless test runner)"

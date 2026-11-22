@@ -26,16 +26,23 @@ mkdir -p "$ICON_DIR"
 chmod +x "$REPO_DIR/bin/emu8086"
 chmod +x "$REPO_DIR/bin/emu8086-tui"
 chmod +x "$REPO_DIR/bin/emu8086-gui"
+chmod +x "$REPO_DIR/bin/emu8086-circuit"
+chmod +x "$REPO_DIR/bin/emu8086-digital"
+chmod +x "$REPO_DIR/circuit_server.py"
 
 # 3. Create symlinks in ~/.local/bin
 ln -sf "$REPO_DIR/bin/emu8086" "$BIN_DIR/emu8086"
 ln -sf "$REPO_DIR/bin/emu8086-tui" "$BIN_DIR/emu8086-tui"
 ln -sf "$REPO_DIR/bin/emu8086-gui" "$BIN_DIR/emu8086-gui"
+ln -sf "$REPO_DIR/bin/emu8086-circuit" "$BIN_DIR/emu8086-circuit"
+ln -sf "$REPO_DIR/bin/emu8086-digital" "$BIN_DIR/emu8086-digital"
 
 echo "✓ CLI launchers installed into $BIN_DIR:"
-echo "    - emu8086      (Unified terminal command)"
-echo "    - emu8086-tui  (Neovim-style interactive modal TUI)"
-echo "    - emu8086-gui  (PyQt5 desktop workbench)"
+echo "    - emu8086         (Unified terminal command)"
+echo "    - emu8086-tui     (Neovim-style interactive modal TUI)"
+echo "    - emu8086-gui     (PyQt5 desktop workbench)"
+echo "    - emu8086-circuit (8086 Circuit Atlas interactive schematic)"
+echo "    - emu8086-digital (8086 Digital Logic pure gate-level workbench)"
 
 # 4. Install desktop icon if present
 if [ -f "$REPO_DIR/image/logo.png" ]; then
@@ -45,7 +52,7 @@ fi
 
 # 5. Install Desktop Entries
 if [ -d "$REPO_DIR/desktop" ]; then
-    for app in emu8086-tui emu8086-gui; do
+    for app in emu8086-tui emu8086-gui emu8086-circuit emu8086-digital; do
         # Escape the quoted Exec argument, then its backslashes for desktop-file parsing.
         launcher=$(printf '%s' "$BIN_DIR/$app" | sed 's/["`$\\]/\\&/g; s/\\/\\\\/g; s/%/%%/g')
         LAUNCHER="$launcher" awk '

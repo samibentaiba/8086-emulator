@@ -185,6 +185,16 @@ class MainWindow(object):
             action_video = devices_menu.addAction("Video Display (0xB8000)")
             action_video.triggered.connect(self.openVideoDisplay)
 
+            devices_menu.addSeparator()
+            action_circuit = devices_menu.addAction("8086 Circuit Atlas (Schematic Workbench)")
+            action_circuit.triggered.connect(self.openCircuitAtlas)
+
+    def openCircuitAtlas(self):
+        import subprocess
+        server_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "circuit_server.py")
+        if os.path.exists(server_py):
+            subprocess.Popen([sys.executable, server_py])
+
     def openTrafficLights(self):
         if hasattr(self.EU, 'peripherals'):
             dev = self.EU.peripherals.get_device(4)

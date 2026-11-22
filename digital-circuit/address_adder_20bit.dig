@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>Dedicated 20-Bit Physical Address Adder (Physical Address = Base20 + Offset16)</string></entry>
+    <entry><string>Width</string><int>5</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Base20</string></entry>
+        <entry><string>Bits</string><int>20</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Offset16</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>PhysAddr</string></entry>
+        <entry><string>Bits</string><int>20</int></entry>
+      </elementAttributes>
+      <pos x="500" y="100"/>
+    </visualElement>
+
+    <!-- Zero extend Offset16 to 20 bits: merge with 4 ground bits -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+        <entry><string>Value</string><int>0</int></entry>
+        <entry><string>Bits</string><int>4</int></entry>
+      </elementAttributes>
+      <pos x="160" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>16,4</string></entry>
+        <entry><string>Output Splitting</string><string>20</string></entry>
+      </elementAttributes>
+      <pos x="200" y="140"/>
+    </visualElement>
+
+    <!-- 20-Bit Adder -->
+    <visualElement>
+      <elementName>Add</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>20</int></entry>
+      </elementAttributes>
+      <pos x="280" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+        <entry><string>Value</string><int>0</int></entry>
+      </elementAttributes>
+      <pos x="260" y="140"/>
+    </visualElement>
+
+    <!-- Verification Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+Base20  Offset16 PhysAddr
+# Test 1: Standard segment 0x10000 + 0x0100 = 0x10100
+0x10000 0x0100   0x10100
+# Test 2: Data segment 0x20000 + 0x0020 = 0x20020
+0x20000 0x0020   0x20020
+# Test 3: Reset vector: 0xF0000 + 0xFFF0 = 0xFFFF0
+0xF0000 0xFFF0   0xFFFF0
+# Test 4: Segment wraparound
+0xF0000 0x0000   0xF0000
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="240"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="100" y="100"/><p2 x="280" y="100"/></wire>
+    <wire><p1 x="100" y="140"/><p2 x="200" y="140"/></wire>
+    <wire><p1 x="160" y="160"/><p2 x="200" y="160"/></wire>
+    <wire><p1 x="220" y="140"/><p2 x="240" y="140"/></wire>
+    <wire><p1 x="240" y="120"/><p2 x="280" y="120"/></wire>
+    <wire><p1 x="240" y="120"/><p2 x="240" y="140"/></wire>
+    <wire><p1 x="260" y="140"/><p2 x="280" y="140"/></wire>
+    <wire><p1 x="340" y="100"/><p2 x="500" y="100"/></wire>
+  </wires>
+</circuit>

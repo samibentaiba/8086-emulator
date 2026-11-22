@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>3x Intel 8282 / 74LS373 Octal Transparent Latches Demultiplexing A19..A0 on ALE Strobe</string></entry>
+    <entry><string>Width</string><int>5</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>AD15_0</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>A19_16</string></entry>
+        <entry><string>Bits</string><int>4</int></entry>
+      </elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>ALE</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>A19_0</string></entry>
+        <entry><string>Bits</string><int>20</int></entry>
+      </elementAttributes>
+      <pos x="600" y="100"/>
+    </visualElement>
+
+    <!-- Merge AD15_0 and A19_16 into 20-bit raw address -->
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>16,4</string></entry>
+        <entry><string>Output Splitting</string><string>20</string></entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+
+    <!-- 20-Bit D-Latch Register enabled by ALE -->
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>20</int></entry>
+        <entry><string>Label</string><string>8282_Latches</string></entry>
+      </elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+
+    <!-- Verification Testcase -->
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Testdata</string>
+          <testData>
+            <dataString>
+ALE AD15_0 A19_16 A19_0
+# Pulse ALE high: latch address 0x12340
+1   0x2340 1      0x12340
+# ALE drops low: address 0x12340 remains latched even when AD bus changes to data!
+0   0xFFFF 0      0x12340
+0   0x0000 0      0x12340
+# New bus cycle: ALE pulses high, latches 0xF0100
+1   0x0100 0xF    0xF0100
+0   0xAAAA 0      0xF0100
+</dataString>
+          </testData>
+        </entry>
+      </elementAttributes>
+      <pos x="300" y="240"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="100" y="100"/><p2 x="200" y="100"/></wire>
+    <wire><p1 x="100" y="140"/><p2 x="160" y="140"/></wire>
+    <wire><p1 x="160" y="140"/><p2 x="160" y="120"/></wire>
+    <wire><p1 x="160" y="120"/><p2 x="200" y="120"/></wire>
+    <!-- Splitter output to Register D -->
+    <wire><p1 x="220" y="100"/><p2 x="300" y="100"/></wire>
+    <!-- ALE to Register clock and en -->
+    <wire><p1 x="100" y="180"/><p2 x="260" y="180"/></wire>
+    <wire><p1 x="260" y="180"/><p2 x="260" y="120"/></wire>
+    <wire><p1 x="260" y="120"/><p2 x="300" y="120"/></wire> # Clock
+    <wire><p1 x="260" y="140"/><p2 x="300" y="140"/></wire> # en
+    <wire><p1 x="260" y="140"/><p2 x="260" y="180"/></wire>
+    <!-- Register Q to Out -->
+    <wire><p1 x="360" y="120"/><p2 x="480" y="120"/></wire>
+    <wire><p1 x="480" y="120"/><p2 x="480" y="100"/></wire>
+    <wire><p1 x="480" y="100"/><p2 x="600" y="100"/></wire>
+  </wires>
+</circuit>

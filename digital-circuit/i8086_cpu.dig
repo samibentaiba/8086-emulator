@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>1</version>
+  <attributes>
+    <entry><string>Description</string><string>Intel 8086 16-Bit Microprocessor 40-Pin DIP Package</string></entry>
+    <entry><string>Width</string><int>8</int></entry>
+  </attributes>
+  <visualElements>
+    <!-- Inputs in exact order -->
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>CLK</string></entry></elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>RESET</string></entry></elementAttributes>
+      <pos x="100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>READY</string></entry></elementAttributes>
+      <pos x="100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>INTR</string></entry></elementAttributes>
+      <pos x="100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes><entry><string>Label</string><string>NMI</string></entry></elementAttributes>
+      <pos x="100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>AD_IN</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="100" y="300"/>
+    </visualElement>
+
+    <!-- Outputs in exact order -->
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>AD_OUT</string></entry>
+        <entry><string>Bits</string><int>16</int></entry>
+      </elementAttributes>
+      <pos x="1100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>A19_16</string></entry>
+        <entry><string>Bits</string><int>4</int></entry>
+      </elementAttributes>
+      <pos x="1100" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>BHE_N</string></entry></elementAttributes>
+      <pos x="1100" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>ALE</string></entry></elementAttributes>
+      <pos x="1100" y="220"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>RD_N</string></entry></elementAttributes>
+      <pos x="1100" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>WR_N</string></entry></elementAttributes>
+      <pos x="1100" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>M_IO_N</string></entry></elementAttributes>
+      <pos x="1100" y="340"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>DEN_N</string></entry></elementAttributes>
+      <pos x="1100" y="380"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes><entry><string>Label</string><string>DT_R</string></entry></elementAttributes>
+      <pos x="1100" y="420"/>
+    </visualElement>
+
+    <!-- Subcircuits Instantiations -->
+    <!-- 1. BIU: Segment Registers at (320, 100) -->
+    <visualElement>
+      <elementName>segment_registers.dig</elementName>
+      <elementAttributes/>
+      <pos x="320" y="100"/>
+    </visualElement>
+
+    <!-- 2. BIU: Instruction Pointer at (320, 240) -->
+    <visualElement>
+      <elementName>instruction_pointer.dig</elementName>
+      <elementAttributes/>
+      <pos x="320" y="240"/>
+    </visualElement>
+
+    <!-- 3. BIU: 20-bit Dedicated Address Adder at (540, 100) -->
+    <visualElement>
+      <elementName>address_adder_20bit.dig</elementName>
+      <elementAttributes/>
+      <pos x="540" y="100"/>
+    </visualElement>
+
+    <!-- Split 20-bit Physical Address into A15_0 and A19_16 at (680, 100) -->
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry><string>Input Splitting</string><string>20</string></entry>
+        <entry><string>Output Splitting</string><string>16,4</string></entry>
+      </elementAttributes>
+      <pos x="680" y="100"/>
+    </visualElement>
+
+    <!-- T-States Bus Cycle Generator: Counter at (180, 400) -->
+    <visualElement>
+      <elementName>Counter</elementName>
+      <elementAttributes>
+        <entry><string>Bits</string><int>2</int></entry>
+        <entry><string>max</string><int>3</int></entry>
+      </elementAttributes>
+      <pos x="180" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="160" y="400"/>
+    </visualElement>
+
+    <!-- Comparator at (280, 400) -->
+    <visualElement>
+      <elementName>Comparator</elementName>
+      <elementAttributes><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="280" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="260" y="420"/>
+    </visualElement>
+
+    <!-- Segment Reg Inputs -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>2</int></entry></elementAttributes>
+      <pos x="300" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="300" y="140"/>
+    </visualElement>
+
+    <!-- IP Component Inputs -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry><entry><string>Bits</string><int>16</int></entry></elementAttributes>
+      <pos x="300" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="300" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="300" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="300" y="320"/>
+    </visualElement>
+
+    <!-- CPU Output Control Consts -->
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="1080" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="1080" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="1080" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>1</int></entry></elementAttributes>
+      <pos x="1080" y="340"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="1080" y="380"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes><entry><string>Value</string><int>0</int></entry></elementAttributes>
+      <pos x="1080" y="420"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <!-- CLK to Counter C at (180, 420) and SegRegs Clock at (320, 160) and IP Clock at (320, 340) -->
+    <wire><p1 x="100" y="100"/><p2 x="120" y="100"/></wire>
+    <wire><p1 x="120" y="100"/><p2 x="120" y="420"/></wire>
+    <wire><p1 x="120" y="420"/><p2 x="180" y="420"/></wire>
+    <wire><p1 x="160" y="400"/><p2 x="180" y="400"/></wire>
+    <wire><p1 x="120" y="100"/><p2 x="260" y="100"/></wire>
+    <wire><p1 x="260" y="100"/><p2 x="260" y="160"/></wire>
+    <wire><p1 x="260" y="160"/><p2 x="320" y="160"/></wire>
+    <wire><p1 x="260" y="160"/><p2 x="260" y="340"/></wire>
+    <wire><p1 x="260" y="340"/><p2 x="320" y="340"/></wire>
+
+    <!-- RESET to Counter clr at (180, 440) and IP Reset at (320, 360) -->
+    <wire><p1 x="100" y="140"/><p2 x="140" y="140"/></wire>
+    <wire><p1 x="140" y="140"/><p2 x="140" y="440"/></wire>
+    <wire><p1 x="140" y="440"/><p2 x="180" y="440"/></wire>
+    <wire><p1 x="140" y="140"/><p2 x="240" y="140"/></wire>
+    <wire><p1 x="240" y="140"/><p2 x="240" y="360"/></wire>
+    <wire><p1 x="240" y="360"/><p2 x="320" y="360"/></wire>
+
+    <!-- Counter out at (240, 400) to Comp at (280, 400) -->
+    <wire><p1 x="240" y="400"/><p2 x="280" y="400"/></wire>
+    <wire><p1 x="260" y="420"/><p2 x="280" y="420"/></wire>
+
+    <!-- ALE out from Comp = at (340, 420) to (1100, 220) -->
+    <wire><p1 x="340" y="420"/><p2 x="1060" y="420"/></wire>
+    <wire><p1 x="1060" y="420"/><p2 x="1060" y="220"/></wire>
+    <wire><p1 x="1060" y="220"/><p2 x="1100" y="220"/></wire>
+
+    <!-- SegRegs Inputs -->
+    <wire><p1 x="300" y="100"/><p2 x="320" y="100"/></wire>
+    <wire><p1 x="300" y="120"/><p2 x="320" y="120"/></wire>
+    <wire><p1 x="300" y="140"/><p2 x="320" y="140"/></wire>
+
+    <!-- Base20 out at (440, 120) to Adder Base20 at (540, 100) -->
+    <wire><p1 x="440" y="120"/><p2 x="480" y="120"/></wire>
+    <wire><p1 x="480" y="120"/><p2 x="480" y="100"/></wire>
+    <wire><p1 x="480" y="100"/><p2 x="540" y="100"/></wire>
+
+    <!-- IP Component Inputs -->
+    <wire><p1 x="300" y="240"/><p2 x="320" y="240"/></wire>
+    <wire><p1 x="300" y="260"/><p2 x="320" y="260"/></wire>
+    <wire><p1 x="300" y="280"/><p2 x="320" y="280"/></wire>
+    <wire><p1 x="300" y="320"/><p2 x="320" y="320"/></wire>
+
+    <!-- IP out at (420, 300) to Adder Offset16 at (540, 140) -->
+    <wire><p1 x="420" y="300"/><p2 x="500" y="300"/></wire>
+    <wire><p1 x="500" y="300"/><p2 x="500" y="140"/></wire>
+    <wire><p1 x="500" y="140"/><p2 x="540" y="140"/></wire>
+
+    <!-- Adder out at (640, 120) to Splitter at (680, 100) -->
+    <wire><p1 x="640" y="120"/><p2 x="660" y="120"/></wire>
+    <wire><p1 x="660" y="120"/><p2 x="660" y="100"/></wire>
+    <wire><p1 x="660" y="100"/><p2 x="680" y="100"/></wire>
+
+    <!-- Splitter out_0 (A15_0) to AD_OUT at (1100, 100) -->
+    <wire><p1 x="700" y="100"/><p2 x="1100" y="100"/></wire>
+    <!-- Splitter out_1 (A19_16) to A19_16 at (1100, 140) -->
+    <wire><p1 x="700" y="120"/><p2 x="860" y="120"/></wire>
+    <wire><p1 x="860" y="120"/><p2 x="860" y="140"/></wire>
+    <wire><p1 x="860" y="140"/><p2 x="1100" y="140"/></wire>
+
+    <!-- Outputs -->
+    <wire><p1 x="1080" y="180"/><p2 x="1100" y="180"/></wire>
+    <wire><p1 x="1080" y="260"/><p2 x="1100" y="260"/></wire>
+    <wire><p1 x="1080" y="300"/><p2 x="1100" y="300"/></wire>
+    <wire><p1 x="1080" y="340"/><p2 x="1100" y="340"/></wire>
+    <wire><p1 x="1080" y="380"/><p2 x="1100" y="380"/></wire>
+    <wire><p1 x="1080" y="420"/><p2 x="1100" y="420"/></wire>
+  </wires>
+</circuit>

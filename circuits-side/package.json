@@ -1,0 +1,12 @@
+{
+  "name": "emu8086-circuits",
+  "version": "1.0.0",
+  "description": "Intel 8086 Microprocessor Circuit Atlas TypeScript schematics",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

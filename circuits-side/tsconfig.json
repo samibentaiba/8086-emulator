@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "None",
+    "outFile": "./diagram.js",
+    "rootDir": "./src",
+    "strict": false,
+    "noImplicitAny": false,
+    "removeComments": false,
+    "lib": ["DOM", "ES2020"]
+  },
+  "include": ["src/**/*"]
+}

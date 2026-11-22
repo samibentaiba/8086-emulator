@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# 8086 Complete Pure Digital Logic Circuit Workbench Launcher (Helmut Neemann's Digital)
+# Launches 100% authentic gate-level digital circuit simulation of the Intel 8086 microprocessor system.
+
+set -e
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
+
+JAR="$REPO_DIR/digital-circuit/bin/Digital/Digital.jar"
+DEFAULT_CIRCUIT="$REPO_DIR/digital-circuit/i8086_system_board.dig"
+
+TARGET="${1:-$DEFAULT_CIRCUIT}"
+
+exec java -jar "$JAR" "$TARGET" "${@:2}"

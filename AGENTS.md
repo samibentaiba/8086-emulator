@@ -92,7 +92,13 @@ The emulator is written in Python (>=3.9) and models an Intel 8086 microprocesso
 | [`emulator/peripherals/stepper_motor.py`](file:///home/sami/Documents/GitHub/8086-emulator/emulator/peripherals/stepper_motor.py) | Port 7 Stepper Motor device | `class StepperMotorDevice` | 4-bit coil excitation, 32 steps/rev, ready bit polling (bit 7), Tkinter dial. |
 | [`emulator/peripherals/video_display.py`](file:///home/sami/Documents/GitHub/8086-emulator/emulator/peripherals/video_display.py) | CGA 80x25 text buffer monitor (`0xB8000`) | `class VideoDisplayDevice` | ASCII character + color attribute byte pair decoding. |
 | [`ui/tui.py`](file:///home/sami/Documents/GitHub/8086-emulator/ui/tui.py) | Full-screen curses interactive debugger | `class EmulatorTUI` | Disassembly pane, Register diffs, Hardware telemetry, Hex/Stack viewer. |
-| [`ui/mainwindow.py`](file:///home/sami/Documents/GitHub/8086-emulator/ui/mainwindow.py) | PyQt5 main window controller | `class MainWindow` | Menu bar, peripheral launch actions, memory tables. |
+| [`ui/mainwindow.py`](file:///home/sami/Documents/GitHub/8086-emulator/ui/mainwindow.py) | PyQt5 main window controller | `class MainWindow` | Menu bar, peripheral launch actions, memory tables, Circuit Atlas launcher. |
+| [`circuit_server.py`](file:///home/sami/Documents/GitHub/8086-emulator/circuit_server.py) | 8086 Circuit Atlas HTTP Server | `launch_circuit()` | Serves 100% interactive Intel 8086 microprocessor circuit workbench in browser. |
+| [`circuits-side/src/`](file:///home/sami/Documents/GitHub/8086-emulator/circuits-side/src/) | Modular TypeScript circuit engine & schematics | `Pin`, `Component`, `LogicGate`, `AutoRouter` | Strongly-typed OOP circuit compiler target for `diagram.js`. |
+| [`build_circuits.py`](file:///home/sami/Documents/GitHub/8086-emulator/build_circuits.py) | Circuit TypeScript compiler helper | `main()`, `find_tsc()` | Compiles `circuits-side/src/` -> `circuits-side/diagram.js`. |
+| [`circuits-side/diagram.js`](file:///home/sami/Documents/GitHub/8086-emulator/circuits-side/diagram.js) | Gate-level logic schematics for all 29 units | `logicDraw` | Full gate schematics: registers, ALU, flags, address adder, 40-pin DIP chip, etc. |
+| [`circuits-side/architecture.js`](file:///home/sami/Documents/GitHub/8086-emulator/circuits-side/architecture.js) | 8086 CPU Architecture & Schematic Renderer | `board` | Multi-scale semantic zoom: architecture -> block level -> gate-level embedded view. |
+| [`bin/emu8086-circuit`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086-circuit) | Standalone Circuit Atlas Launcher | Shell script | Zero-dependency browser entry point for interactive 8086 circuit schematic. |
 | [`bin/emu8086-tui`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086-tui) | Standalone Linux TUI Launcher | Shell script | Zero-dependency terminal entry point (`readlink -f`). |
 | [`bin/emu8086-gui`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086-gui) | Standalone Linux GUI Launcher | Shell script | Desktop entry point with auto-detection for PyQt5 and NixOS. |
 | [`bin/emu8086`](file:///home/sami/Documents/GitHub/8086-emulator/bin/emu8086) | Unified CLI Launcher | Shell script | Auto-dispatches to headless CLI (`-n`) or modal TUI. |
@@ -219,3 +225,59 @@ pip install -e .
 emu8086 ./tests/Hardware/traffic_lights_demo.asm -n
 emu8086-tui ./tests/Requirement/bubble_sort.asm
 ```
+
+---
+
+## 7. Circuit Atlas CAD Schematic Drawing Invariants & Automated Inspection
+
+AI agents extending [`circuits-side/src/`](file:///home/sami/Documents/GitHub/8086-emulator/circuits-side/src/) must adhere strictly to these visual and geometric CAD schematic laws. Any violation causes ugly visual glitches, wire collisions, or gate body occlusions.
+
+### 7.1 The 6 Cardinal CAD Invariants
+
+```
+┌───────────────────────────────── 56px Column Grid ─────────────────────────────────┐
+│ Zone 1: Input Drops (xL+1..xL+9)  │ Zone 2: Gates (xL+10..xL+24) │ Zone 3: Output & MUX (xL+26..xL+55) │
+│ - Track A:      xL + 3           │ - B_INV: Y = 92..102         │ - chanSum: xL + 27 ──► mux.in0     │
+│ - Track B / B*: xL + 6           │ - P:     Y = 112..122        │ - chanP:   xL + 29 ──► mux.in1     │
+│ - Track Cin:    xL + 8           │ - G:     Y = 130..140        │ - chanG:   xL + 31 ──► mux.in2     │
+│ (All turn 90° right into gates)  │ - OR:    Y = 148..158        │ - chanOr:  xL + 33 ──► mux.in3     │
+│                                  │ - SUM:   Y = 166..176        │ - MUX:     xL + 36..xL + 52        │
+│                                  │ (ZERO vertical wires run     │ - resDrop: xL + 54 ──► Highway     │
+│                                  │  through this zone!)         │ (Approaches MUX from left)         │
+└──────────────────────────────────┴──────────────────────────────┴────────────────────────────────────┘
+```
+
+1. **Rule 1 — Zero Gate Body Penetration (The Roof/Belly Plunge Error)**:
+   - Wires MUST NEVER cross through the geometric bounding box of any gate, flip-flop, buffer, or multiplexer.
+   - All logic gate inputs (`in0`, `in1`) MUST approach horizontally from the left.
+   - All logic gate outputs (`out`) MUST exit horizontally to the right.
+   - Control lines (e.g. MUX select) MUST enter vertically at the bottom center (`sel`).
+2. **Rule 2 — The 3-Zone Planar Routing Law**:
+   - Every column or bit-slice MUST be partitioned into 3 non-overlapping X-coordinate intervals:
+     - `Zone 1` ($X \in [X_L, X_L + 9]$): Vertical input drops ($A, B, C_{in}$).
+     - `Zone 2` ($X \in [X_L + 10, X_L + 24]$): Gate bodies only. **Zero vertical routing allowed.**
+     - `Zone 3` ($X \in [X_L + 25, X_L + 56]$): Intermediate routing tracks, multiplexers, and result drops.
+   - Because $Zone_1 \cap Zone_2 = \emptyset$ and $Zone_2 \cap Zone_3 = \emptyset$, wire-to-gate collisions are mathematically impossible.
+3. **Rule 3 — Zero Floating Solder Dots & Unbroken Strobe Spines**:
+   - Solder dots (`addDot(...)`) must ONLY exist at genuine physical intersections between two or more wire paths.
+   - Multi-row strobe spines (e.g., `RDA`, `WE`, `RDB`, `SUB`, `FN_SEL`) must be continuous from the topmost row to the bottommost row (`M x y_top V y_bottom`), never starting halfway down.
+   - Never leave a solder dot floating on an open dead-end line.
+4. **Rule 4 — Minimum 6px Parallel Clearance (Zero Pixel Smudging)**:
+   - Parallel wires must maintain at least **6–8px clear gap**.
+   - Never assign identical or near-identical coordinates (e.g. $Y = 110$ for two independent signals), which causes SVG stroke overlap and ugly dark smudges.
+5. **Rule 5 — Zero Boundary Leaking & Exterior Wire Looping**:
+   - All circuits must be strictly self-contained within their card boundary ($X \in [10, 1270]$, $Y \in [6, 440]$).
+   - Buses and highways must connect directly into destination PortBoxes in a **straight horizontal line**, without U-turns or looping outside the card perimeter.
+   - Flag lines must drop straight into the bottom flag container (`portFlags`), never running below the bottom margin.
+6. **Rule 6 — Zero Text, Header, & Badge Occlusions**:
+   - Wires must NEVER cut through component headers, bit badges (`BIT 15`, `BIT 0`), or hex value readouts.
+   - Drops from top ports or buses must pass exclusively through dedicated vertical channels located *between* badge labels.
+
+### 7.2 Automated Schematic Linter
+
+Run the automated schematic inspector before submitting any changes:
+```bash
+python3 build_circuits.py && python3 tools/lint_schematics.py
+```
+*The inspector verifies that rendered SVGs have 0 gate penetrations, 0 boundary violations, 0 floating dots, and 0 parallel wire collisions.*
+

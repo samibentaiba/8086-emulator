@@ -29,12 +29,13 @@ windows = ["windows-curses>=2.3"]
 emu8086      = "main:main"
 emu8086-tui  = "tui:main"
 emu8086-gui  = "mainUI:main"
+emu8086-circuit = "circuit_server:launch_circuit"
 
 [project.gui-scripts]
 emu8086-gui-windowed = "mainUI:main"
 
 [tool.setuptools]
-py-modules = ["main", "tui", "mainUI"]
+py-modules = ["main", "tui", "mainUI", "circuit_server"]
 
 [tool.setuptools.packages.find]
 where = ["."]
