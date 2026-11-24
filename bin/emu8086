@@ -7,7 +7,7 @@ SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")/.." && pwd)"
 export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
 
-# If user passes circuit flag (-c), launch Circuit Atlas
+# If user passes circuit flag (-c), launch Circuit Workbench
 for arg in "$@"; do
     if [ "$arg" = "-c" ] || [ "$arg" = "--circuit" ]; then
         exec python3 "$REPO_DIR/circuit_server.py" "$@"

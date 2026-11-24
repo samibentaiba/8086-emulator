@@ -2,7 +2,7 @@
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Status & Control Flags Register (FR)
+ * Intel 8086 Circuit Workbench - 16-Bit Status & Control Flags Register (FR)
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, DffCell, LogicGate.
  * Full 16-Bit Flip-Flop Register Array:
  *   - 6 Arithmetic Status Flags: CF (bit 0), PF (bit 2), AF (bit 4), ZF (bit 6), SF (bit 7), OF (bit 11)
@@ -21,9 +21,9 @@
  *   - Zero Parallel Wire Collisions / Smudges
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
-  export function flagsLogic(s: any): string {
+  export function flagsLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     // Microcode Execution & ALU Calculations

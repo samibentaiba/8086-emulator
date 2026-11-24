@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build helper script to compile circuits-side TypeScript sources to circuits-side/diagram.js
+Compatibility entry point for the TypeScript workbench build.
 """
 import glob
 import os
@@ -14,7 +14,14 @@ TSCONFIG_PATH = os.path.join(CIRCUITS_DIR, "tsconfig.json")
 
 
 def find_tsc():
-    # 1. System PATH
+    # Prefer the lockfile-pinned compiler. Invoke Node directly on Windows rather
+    # than trying to execute npm's .cmd shim as an executable.
+    node = shutil.which("node")
+    local = os.path.join(CIRCUITS_DIR, "node_modules", "typescript", "bin", "tsc")
+    if node and os.path.isfile(local):
+        return [node, local]
+
+    # System PATH (also supports the existing Nix development environment).
     tsc = shutil.which("tsc")
     if tsc:
         return tsc
@@ -24,11 +31,6 @@ def find_tsc():
     if nix_candidates:
         return nix_candidates[0]
 
-    # 3. Node modules or npx
-    npx = shutil.which("npx")
-    if npx:
-        return [npx, "tsc"]
-
     return None
 
 
@@ -36,19 +38,18 @@ def main():
     tsc_cmd = find_tsc()
     if not tsc_cmd:
         print("[ERROR] TypeScript compiler (tsc) not found on PATH or in /nix/store/.", file=sys.stderr)
-        print("Please install TypeScript (e.g., npm install -g typescript) or use nix-shell.", file=sys.stderr)
+        print("Run npm ci in circuits-side, or use nix-shell.", file=sys.stderr)
         return 1
 
-    cmd = [tsc_cmd] if isinstance(tsc_cmd, str) else list(tsc_cmd)
-    cmd.extend(["-p", TSCONFIG_PATH])
-
-    print(f"[INFO] Compiling TypeScript: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=CIRCUITS_DIR)
-    if result.returncode == 0:
-        print("[SUCCESS] Successfully compiled circuits-side/src/ -> circuits-side/diagram.js")
-    else:
-        print(f"[FAIL] tsc exited with error code {result.returncode}", file=sys.stderr)
-    return result.returncode
+    for config in ("tsconfig.json", "tsconfig.app.json", "tsconfig.server.json"):
+        cmd = [tsc_cmd] if isinstance(tsc_cmd, str) else list(tsc_cmd)
+        cmd.extend(["-p", os.path.join(CIRCUITS_DIR, config)])
+        print(f"[INFO] Compiling {config}")
+        result = subprocess.run(cmd, cwd=CIRCUITS_DIR)
+        if result.returncode:
+            return result.returncode
+    print("[SUCCESS] Built schematic engine, browser UI, and preview server.")
+    return 0
 
 
 if __name__ == "__main__":

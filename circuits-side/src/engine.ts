@@ -1,19 +1,27 @@
 /// <reference path="types.ts" />
 /// <reference path="primitives.ts" />
+/// <reference path="routing.ts" />
 /**
- * Intel 8086 Circuit Atlas - OOP Schematic Engine (Auto-Router & Component Graph)
+ * Intel 8086 Circuit Workbench - Schematic Engine and Component Graph
  */
 namespace LogicDraw {
   export class Pin implements IPin {
+    private relativeX: number;
+    private relativeY: number;
     constructor(
       public owner: IComponent,
       public id: string,
-      public x: number,
-      public y: number,
+      x: number,
+      y: number,
       public dir: PinDirection = "L",
       public label: string = "",
       public busWidth: number = 1
-    ) {}
+    ) { this.relativeX = x - owner.x; this.relativeY = y - owner.y; }
+
+    get x(): number { return this.owner.x + this.relativeX; }
+    set x(value: number) { this.relativeX = value - this.owner.x; }
+    get y(): number { return this.owner.y + this.relativeY; }
+    set y(value: number) { this.relativeY = value - this.owner.y; }
   }
 
   export class Component implements IComponent {
@@ -28,6 +36,7 @@ namespace LogicDraw {
     ) {}
 
     addPin(id: string, rx: number, ry: number, dir: PinDirection = "L", label: string = "", busWidth: number = 1): IPin {
+      if (this.pins.has(id)) throw new Error(`Duplicate pin '${id}' on component '${this.id}'`);
       const p = new Pin(this, id, this.x + rx, this.y + ry, dir, label, busWidth);
       this.pins.set(id, p);
       return p;
@@ -205,7 +214,7 @@ namespace LogicDraw {
       busWidth: number = 1
     ): IPin {
       const rx = this.side === "left" ? (isExternal ? 0 : this.w) : (isExternal ? this.w : 0);
-      const dir: PinDirection = this.side === "left" ? "L" : "R";
+      const dir: PinDirection = rx === 0 ? "L" : "R";
       const pin = this.addPin(id, rx, ry, dir, label, busWidth);
       this.pinsList.push({ id, label, color, isExternal, ry, busWidth });
       return pin;
@@ -276,6 +285,23 @@ namespace LogicDraw {
     public wires: string[] = [];
     public dots: string[] = [];
     public labels: string[] = [];
+    private connections: Array<{ from: RoutePoint; to: RoutePoint; options: RouteOptions }> = [];
+    private keepouts: RoutingRect[] = [];
+
+    constructor(public routing: RoutingOptions = {}) {}
+
+    /** Resolve connections only after every component is placed. Moving a
+     * component updates its pins and reroutes the next render automatically. */
+    connect(from: RoutePoint, to: RoutePoint, options: RouteOptions = {}): this {
+      this.connections.push({ from, to, options });
+      return this;
+    }
+
+    /** Reserve label/header space as well as component bodies. */
+    reserve(rect: RoutingRect): this {
+      this.keepouts.push(rect);
+      return this;
+    }
 
     addBackground(svg: string): this {
       this.backgrounds.push(svg);
@@ -293,6 +319,7 @@ namespace LogicDraw {
     }
 
     addComponent(c: IComponent): this {
+      if (this.components.some(existing => existing.id === c.id)) throw new Error(`Duplicate component '${c.id}'`);
       this.components.push(c);
       return this;
     }
@@ -308,6 +335,12 @@ namespace LogicDraw {
     }
 
     render(): string {
+      const router = new AutoRouter({
+        ...this.routing,
+        obstacles: [...(this.routing.obstacles ?? []), ...this.keepouts,
+          ...this.components.filter(c => !(c instanceof SubcircuitCard)).map(c => ({ ...c.bounds(), id: c.id }))],
+      });
+      this.connections.forEach(connection => router.route(connection.from, connection.to, connection.options));
       // Guaranteed CAD Layer Order:
       // 1. Backgrounds & Subcircuit cards
       // 2. Continuous data buses & wordlines
@@ -318,8 +351,9 @@ namespace LogicDraw {
       return (
         this.backgrounds.join("") +
         this.buses.join("") +
-        this.components.map((c) => c.render()).join("") +
+        this.components.map(c => `<g data-component="${escapeText(c.id).replace(/"/g, "&quot;")}" data-x="${c.x}" data-y="${c.y}" data-width="${c.w}" data-height="${c.h}">${c.render()}</g>`).join("") +
         this.wires.join("") +
+        router.render() +
         this.dots.join("") +
         this.labels.join("")
       );
@@ -331,42 +365,31 @@ namespace LogicDraw {
     public dots: string[] = [];
     public slashes: string[] = [];
     public labels: string[] = [];
+    private connections: RoutedConnection[] = [];
+
+    constructor(public options: RoutingOptions = {}) {}
+
+    get routes(): readonly RoutePoint[][] {
+      return this.connections.map(connection => connection.points.map(point => ({ ...point })));
+    }
 
     route(p1: RoutePoint, p2: RoutePoint, opt: RouteOptions = {}): this {
       const c = opt.color || paths.data;
-      const w = opt.width || 1.0;
-      let d = "";
-
-      if (opt.waypoints && opt.waypoints.length > 0) {
-        d = `M${p1.x} ${p1.y}`;
-        for (const pt of opt.waypoints) {
-          if (Array.isArray(pt)) d += ` L${pt[0]} ${pt[1]}`;
-          else if (typeof pt === "object" && pt.x !== undefined) d += ` L${pt.x} ${pt.y}`;
-        }
-        d += ` L${p2.x} ${p2.y}`;
-      } else if (p1.y === p2.y) {
-        d = `M${p1.x} ${p1.y}H${p2.x}`;
-      } else if (p1.x === p2.x) {
-        d = `M${p1.x} ${p1.y}V${p2.y}`;
-      } else if (opt.viaX !== undefined) {
-        d = `M${p1.x} ${p1.y}H${opt.viaX}V${p2.y}H${p2.x}`;
-      } else if (opt.viaY !== undefined) {
-        d = `M${p1.x} ${p1.y}V${opt.viaY}H${p2.x}V${p2.y}`;
-      } else if (p1.dir === "R" && p2.dir === "L") {
-        const midX = opt.midX || (p1.x + p2.x) / 2;
-        d = `M${p1.x} ${p1.y}H${midX}V${p2.y}H${p2.x}`;
-      } else if ((p1.dir === "B" || p1.dir === "T") && p2.dir === "L") {
-        d = `M${p1.x} ${p1.y}V${p2.y}H${p2.x}`;
-      } else if (p1.dir === "R" && (p2.dir === "T" || p2.dir === "B")) {
-        d = `M${p1.x} ${p1.y}H${p2.x}V${p2.y}`;
-      } else {
-        d = `M${p1.x} ${p1.y}H${p2.x}V${p2.y}`;
-      }
-
-      this.paths.push(P(d, c, w));
+      const w = opt.width ?? 1.0;
+      const points = orthogonalRoute(p1, p2, { ...this.options, ...opt }, this.connections);
+      const net = opt.net ?? `wire-${this.connections.length}`;
+      this.connections.push({ points, net });
+      this.paths.push(P(routePath(points), c, w, "none", `data-net="${escapeText(net).replace(/"/g, "&quot;")}"`));
       if (opt.busSlash) {
-        const sx = opt.slashX !== undefined ? opt.slashX : (p1.x + p2.x) / 2;
-        const sy = opt.slashY !== undefined ? opt.slashY : (p1.y + p2.y) / 2;
+        // Put annotations on an actual segment, not the endpoints' midpoint.
+        let segment = 1;
+        for (let i = 2; i < points.length; i++) {
+          const length = (index: number) => Math.abs(points[index].x - points[index - 1].x) + Math.abs(points[index].y - points[index - 1].y);
+          if (length(i) > length(segment)) segment = i;
+        }
+        const a = points[segment - 1] ?? p1, b = points[segment] ?? p2;
+        const sx = opt.slashX ?? (a.x + b.x) / 2;
+        const sy = opt.slashY ?? (a.y + b.y) / 2;
         this.slashes.push(busSlash(sx, sy, opt.busSlash, c));
       }
       return this;
@@ -377,17 +400,31 @@ namespace LogicDraw {
       const fromX = Array.isArray(from) ? from[0] : from.x;
       const fromY = Array.isArray(from) ? from[1] : from.y;
 
-      if (opt.dot !== false) {
-        this.dots.push(dot(fromX, fromY, c, opt.dotRadius || 1.6));
+      const parent = this.connections.find(connection => connection.points.some((p, i) => i > 0 &&
+        this.onSegment(fromX, fromY, connection.points[i - 1], p)));
+      if (opt.dot !== false && !parent) throw new RoutingError("A branch junction must lie on an existing routed wire.");
+      if (parent && opt.dot !== false && opt.net !== undefined && opt.net !== parent.net) {
+        throw new RoutingError("A branch junction cannot join different signal nets.");
       }
-
-      const startPin: RoutePoint = { x: fromX, y: fromY, dir: opt.dir || "B" };
-      return this.route(startPin, to, opt);
+      const startPin: RoutePoint = { x: fromX, y: fromY, dir: opt.dir };
+      this.route(startPin, to, { ...opt, net: opt.net ?? parent?.net });
+      if (opt.dot !== false) this.dots.push(dot(fromX, fromY, c, opt.dotRadius ?? 1.6));
+      return this;
     }
 
     addDot(x: number, y: number, color: string = paths.data, r: number = 1.8): this {
+      const wires = this.connections.filter(connection => connection.points.some((p, i) => i > 0 &&
+        this.onSegment(x, y, connection.points[i - 1], p)));
+      if (wires.length < 2 || new Set(wires.map(wire => wire.net)).size !== 1) {
+        throw new RoutingError("A junction dot requires intersecting wires of the same net.");
+      }
       this.dots.push(dot(x, y, color, r));
       return this;
+    }
+
+    private onSegment(x: number, y: number, a: RoutePoint, b: RoutePoint): boolean {
+      return (a.x === b.x && x === a.x && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) ||
+        (a.y === b.y && y === a.y && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x));
     }
 
     addSlash(x: number, y: number, width: string = "4", color: string = paths.data): this {

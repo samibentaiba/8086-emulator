@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-8086 Circuit Atlas — Standalone Server & Visualization Launcher
-Serves the full 100% interactive Intel 8086 microprocessor circuit workbench in the browser.
+8086 Circuit Workbench — Static Server & Browser Launcher
+Serves the TypeScript-built visualization; no Python execution runs in the browser.
 """
 
 import os
@@ -44,7 +44,7 @@ def launch_circuit(port=8086, open_browser=True):
 
     url = f"http://localhost:{actual_port}/"
     print("\n" + "=" * 68)
-    print("  ★ Intel 8086 Microprocessor Circuit Atlas & Workbench ★")
+    print("  Intel 8086 Microprocessor Circuit Workbench")
     print(f"  Live Interactive Schematic: {url}")
     print("  Press Ctrl+C to stop.")
     print("=" * 68 + "\n")
@@ -55,7 +55,7 @@ def launch_circuit(port=8086, open_browser=True):
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopped 8086 Circuit Atlas server.")
+        print("\nStopped 8086 Circuit Workbench server.")
     finally:
         httpd.server_close()
 

@@ -1,6 +1,6 @@
 /// <reference path="types.ts" />
 /**
- * Intel 8086 Circuit Atlas - SVG Drawing Primitives & Helpers
+ * Intel 8086 Circuit Workbench - SVG Drawing Primitives & Helpers
  */
 namespace LogicDraw {
   export const paths = {
@@ -17,8 +17,11 @@ namespace LogicDraw {
     gnd: "#334155",
   };
 
+  export const escapeText = (value: string | number): string => String(value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
   export const T = (x: number, y: number, v: string | number, size: number = 12, opt: string = ""): string =>
-    `<text x="${x}" y="${y}" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="${size}" fill="#223326" ${opt}>${v}</text>`;
+    `<text x="${x}" y="${y}" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="${size}" fill="#223326" ${opt}>${escapeText(v)}</text>`;
   
   export const mono = (x: number, y: number, v: string | number, size: number = 10, opt: string = ""): string =>
     T(x, y, v, size, `style="font-family:Consolas,'Liberation Mono',monospace" ${opt}`);
@@ -65,7 +68,7 @@ namespace LogicDraw {
     return `<g transform="translate(${x} ${y})">${extra}${P(d, c, 1.4, f)}</g>`;
   };
 
-  export const dff = (x: number, y: number, w: number = 34, h: number = 38, clk: any = 0, d: any = 0, q: any = 0, lbl: string = "DFF"): string => {
+  export const dff = (x: number, y: number, w: number = 34, h: number = 38, clk: number | boolean = 0, d: number | boolean = 0, q: number | boolean = 0, lbl: string = "DFF"): string => {
     let out = R(x, y, w, h, q ? "#e7f6ea" : "#fffef4", q ? "#156b46" : "#6a7b70", 2, 1.3);
     out += P(`M${x} ${y + h / 2 - 4} L${x + 5} ${y + h / 2} L${x} ${y + h / 2 + 4}`, "#475569", 1.2);
     out += mono(x + 4, y + 10, "D", 7, 'fill="#334155"');
@@ -75,7 +78,7 @@ namespace LogicDraw {
     return out;
   };
 
-  export const dlatch = (x: number, y: number, w: number = 30, h: number = 34, le: any = 0, q: any = 0, lbl: string = "LAT"): string => {
+  export const dlatch = (x: number, y: number, w: number = 30, h: number = 34, le: number | boolean = 0, q: number | boolean = 0, lbl: string = "LAT"): string => {
     let out = R(x, y, w, h, q ? "#e7f6ea" : "#fbfdf9", q ? "#156b46" : "#6a7b70", 2, 1.2);
     out += mono(x + 4, y + 11, "D", 7, 'fill="#334155"');
     out += mono(x + 4, y + h - 6, "LE", 6.5, 'fill="' + (le ? "#156b46" : "#64748b") + '" font-weight="bold"');
@@ -120,6 +123,6 @@ namespace LogicDraw {
     return out;
   };
 
-  export const hex = (v: any, n: number = 4): string => (v != null ? (v >>> 0).toString(16).toUpperCase().padStart(n, "0") : "—");
-  export const bin = (v: any, n: number = 8): string => (v != null ? (v >>> 0).toString(2).padStart(n, "0") : "—");
+  export const hex = (v: number | null | undefined, n: number = 4): string => (v != null ? (v >>> 0).toString(16).toUpperCase().padStart(n, "0") : "—");
+  export const bin = (v: number | null | undefined, n: number = 8): string => (v != null ? (v >>> 0).toString(2).padStart(n, "0") : "—");
 }

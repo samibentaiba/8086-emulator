@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=8086 Circuit Atlas
+Name=8086 Circuit Workbench
 GenericName=Intel 8086 Microprocessor Circuit Workbench
 Comment=Interactive gate-level and architectural schematic explorer for the Intel 8086 CPU
 Exec=emu8086-circuit

@@ -2,15 +2,15 @@
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Dual-Port Register File (AX..DI)
+ * Intel 8086 Circuit Workbench - 16-Bit Dual-Port Register File (AX..DI)
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, DffCell, TriStateBuffer, LogicGate.
  * Exactly 128 Bascules D (16 bits × 8 registers) + 256 Tri-State Drivers.
  * Guaranteed Layer-Ordering: Zero wire masking, zero floating dots, zero wire collisions.
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
-  export function registersLogic(s: any): string {
+  export function registersLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     // Microcode Execution Control Signals (Pure IDLE when s.phase === 0 / reset)

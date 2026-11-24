@@ -2,7 +2,7 @@
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - Microarchitecture & Subsystem Electrical Logic Modules
+ * Intel 8086 Circuit Workbench - Microarchitecture & Subsystem Electrical Logic Modules
  *
  * NOTE: All 31 microarchitecture and subsystem units have been fully modularized
  * into dedicated modules under circuits-side/src/modules/:

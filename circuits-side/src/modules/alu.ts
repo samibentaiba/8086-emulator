@@ -2,7 +2,7 @@
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Parallel ALU & 4-Bit CLA Architecture
+ * Intel 8086 Circuit Workbench - 16-Bit Parallel ALU & 4-Bit CLA Architecture
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, MuxComponent.
  * Full Discrete 16-Bit Bit-Slice Matrix (Bit 15 down to Bit 0) organized into 4 CLA Nibble Blocks.
  * Mathematically Unified Macro-Micro Interconnects:
@@ -20,9 +20,9 @@
  *   - Zero Exterior Looping
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
-  export function adderLogic(s: any, bit: number = 0): string {
+  export function adderLogic(s: SchematicState, bit: number = 0): string {
     const canvas = new SchematicCanvas();
 
     // Microcode Execution & ALU Calculations
@@ -30,8 +30,10 @@ namespace LogicDraw {
       ? cpu.calculate()
       : { word: 0, flags: { CF: 0, PF: 0, AF: 0, ZF: 0, SF: 0, OF: 0 } };
 
-    const wordA = s.tmpA ?? s.ax ?? 0;
-    const wordB = s.tmpB ?? s.bx ?? 0;
+    const inputs = typeof cpu !== "undefined" && cpu.inputs
+      ? cpu.inputs() : [s.a ?? s.ax ?? 0, s.b ?? s.bx ?? 0];
+    const wordA = s.tmpA ?? inputs[0];
+    const wordB = s.tmpB ?? inputs[1];
     const sWord = calc.word ?? 0;
     const flags = calc.flags ?? { CF: 0, PF: 0, AF: 0, ZF: 0, SF: 0, OF: 0 };
 

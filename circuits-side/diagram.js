@@ -1,6 +1,8 @@
+"use strict";
+/// <reference path="workbench-types.d.ts" />
 /// <reference path="types.ts" />
 /**
- * Intel 8086 Circuit Atlas - SVG Drawing Primitives & Helpers
+ * Intel 8086 Circuit Workbench - SVG Drawing Primitives & Helpers
  */
 var LogicDraw;
 (function (LogicDraw) {
@@ -17,7 +19,9 @@ var LogicDraw;
         power: "#b91c1c",
         gnd: "#334155",
     };
-    LogicDraw.T = (x, y, v, size = 12, opt = "") => `<text x="${x}" y="${y}" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="${size}" fill="#223326" ${opt}>${v}</text>`;
+    LogicDraw.escapeText = (value) => String(value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    LogicDraw.T = (x, y, v, size = 12, opt = "") => `<text x="${x}" y="${y}" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="${size}" fill="#223326" ${opt}>${LogicDraw.escapeText(v)}</text>`;
     LogicDraw.mono = (x, y, v, size = 10, opt = "") => LogicDraw.T(x, y, v, size, `style="font-family:Consolas,'Liberation Mono',monospace" ${opt}`);
     LogicDraw.R = (x, y, w, h, fill, stroke = "none", r = 3, sw = 1) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     LogicDraw.P = (d, c = "#364639", w = 1.5, fill = "none", more = "") => `<path d="${d}" fill="${fill}" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${more}/>`;
@@ -111,9 +115,250 @@ var LogicDraw;
     LogicDraw.bin = (v, n = 8) => (v != null ? (v >>> 0).toString(2).padStart(n, "0") : "—");
 })(LogicDraw || (LogicDraw = {}));
 /// <reference path="types.ts" />
+var LogicDraw;
+(function (LogicDraw) {
+    class RoutingError extends Error {
+        constructor(message) { super(message); this.name = "RoutingError"; }
+    }
+    LogicDraw.RoutingError = RoutingError;
+    const samePoint = (a, b) => a.x === b.x && a.y === b.y;
+    const inside = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+    const contained = (p, r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+    const inflate = (r, gap) => ({ x: r.x - gap, y: r.y - gap, w: r.w + gap * 2, h: r.h + gap * 2, id: r.id });
+    /** Strict interior intersection: following an inflated edge preserves clearance. */
+    function segmentHitsRect(a, b, r) {
+        if (a.y === b.y)
+            return a.y > r.y && a.y < r.y + r.h &&
+                Math.max(a.x, b.x) > r.x && Math.min(a.x, b.x) < r.x + r.w;
+        if (a.x === b.x)
+            return a.x > r.x && a.x < r.x + r.w &&
+                Math.max(a.y, b.y) > r.y && Math.min(a.y, b.y) < r.y + r.h;
+        throw new RoutingError("Wire segments must be orthogonal.");
+    }
+    LogicDraw.segmentHitsRect = segmentHitsRect;
+    function simplifyRoute(points) {
+        const result = [];
+        for (const point of points) {
+            if (result.length && samePoint(result[result.length - 1], point))
+                continue;
+            while (result.length >= 2) {
+                const a = result[result.length - 2], b = result[result.length - 1];
+                // Preserve reversals: they are not redundant collinear points.
+                if ((a.x === b.x && b.x === point.x && (b.y - a.y) * (point.y - b.y) >= 0) ||
+                    (a.y === b.y && b.y === point.y && (b.x - a.x) * (point.x - b.x) >= 0))
+                    result.pop();
+                else
+                    break;
+            }
+            result.push({ x: point.x, y: point.y });
+        }
+        return result;
+    }
+    LogicDraw.simplifyRoute = simplifyRoute;
+    function routePath(points) {
+        return points.map((point, i) => i === 0 ? `M${point.x} ${point.y}` :
+            points[i - 1].y === point.y ? `H${point.x}` : `V${point.y}`).join("");
+    }
+    LogicDraw.routePath = routePath;
+    class RouteHeap {
+        constructor() {
+            this.entries = [];
+        }
+        before(a, b) {
+            return a.rank < b.rank || (a.rank === b.rank && a.id < b.id);
+        }
+        push(entry) {
+            let i = this.entries.length;
+            this.entries.push(entry);
+            while (i > 0) {
+                const parent = (i - 1) >> 1;
+                if (!this.before(entry, this.entries[parent]))
+                    break;
+                this.entries[i] = this.entries[parent];
+                i = parent;
+            }
+            this.entries[i] = entry;
+        }
+        pop() {
+            const first = this.entries[0], tail = this.entries.pop();
+            if (!tail || !this.entries.length)
+                return first;
+            let i = 0;
+            while (i * 2 + 1 < this.entries.length) {
+                let child = i * 2 + 1;
+                if (child + 1 < this.entries.length && this.before(this.entries[child + 1], this.entries[child]))
+                    child++;
+                if (!this.before(this.entries[child], tail))
+                    break;
+                this.entries[i] = this.entries[child];
+                i = child;
+            }
+            this.entries[i] = tail;
+            return first;
+        }
+    }
+    function parallelConflict(a, b, c, d, gap) {
+        if (a.y === b.y && c.y === d.y)
+            return Math.abs(a.y - c.y) < gap &&
+                Math.max(Math.min(a.x, b.x), Math.min(c.x, d.x)) < Math.min(Math.max(a.x, b.x), Math.max(c.x, d.x));
+        if (a.x === b.x && c.x === d.x)
+            return Math.abs(a.x - c.x) < gap &&
+                Math.max(Math.min(a.y, b.y), Math.min(c.y, d.y)) < Math.min(Math.max(a.y, b.y), Math.max(c.y, d.y));
+        return false;
+    }
+    /** Visibility-grid A*: node coordinates come from obstacle edges, never pixel rounding. */
+    function orthogonalRoute(source, target, options = {}, previous = []) {
+        const clearance = options.clearance ?? 6;
+        const requestedStub = options.stub ?? 8;
+        const stub = Math.max(requestedStub, clearance);
+        const bendCost = options.bendCost ?? 8;
+        if (![clearance, requestedStub, bendCost].every(Number.isFinite) || clearance < 0 || requestedStub < 0 || bendCost < 0) {
+            throw new RoutingError("Routing clearance, stubs and bend costs must be finite and nonnegative.");
+        }
+        const bodies = options.obstacles ?? [];
+        const rectangles = options.bounds ? [...bodies, options.bounds] : bodies;
+        if (rectangles.some(r => ![r.x, r.y, r.w, r.h].every(Number.isFinite) || r.w < 0 || r.h < 0)) {
+            throw new RoutingError("Routing rectangles must have finite coordinates and nonnegative dimensions.");
+        }
+        if (![source.x, source.y, target.x, target.y].every(Number.isFinite))
+            throw new RoutingError("Invalid pin coordinates.");
+        if (samePoint(source, target))
+            throw new RoutingError("A wire requires distinct endpoint coordinates.");
+        if ([source.dir, target.dir].some(dir => dir !== undefined && !["L", "R", "T", "B"].includes(dir))) {
+            throw new RoutingError("Invalid pin direction.");
+        }
+        const obstacles = bodies.map(r => inflate(r, clearance));
+        const reserved = options.avoidParallel === false ? [] : previous.filter(r => !options.net || r.net !== options.net);
+        const validPoint = (p) => (!options.bounds || contained(p, options.bounds)) && !obstacles.some(r => inside(p, r));
+        const clearSegment = (a, b, ignored = -1) => (a.x === b.x || a.y === b.y) &&
+            (!options.bounds || (contained(a, options.bounds) && contained(b, options.bounds))) &&
+            !obstacles.some((r, i) => i !== ignored && segmentHitsRect(a, b, r)) &&
+            !reserved.some(route => route.points.some((p, i) => i > 0 && parallelConflict(a, b, route.points[i - 1], p, clearance)));
+        // A pin may lie on a shaped component inside its rectangular envelope. Its
+        // only permitted traversal of that envelope is the outward, straight stub.
+        const escape = (pin) => {
+            if (!pin.dir) {
+                if (!validPoint(pin))
+                    throw new RoutingError("An undirected endpoint lies inside an obstacle or outside the canvas.");
+                return { x: pin.x, y: pin.y };
+            }
+            // Board ports may identify their owner by name; component pins hold the
+            // component itself. Neither form may accidentally waive another body.
+            const owner = "owner" in pin ? pin.owner : undefined;
+            const ownerId = typeof owner === "string" ? owner : owner?.id;
+            const index = bodies.findIndex(r => ownerId ? r.id === ownerId : contained(pin, r));
+            const body = index < 0 ? undefined : bodies[index];
+            if (body && !contained(pin, body))
+                throw new RoutingError("A pin lies outside its owner's bounds.");
+            const point = { x: pin.x, y: pin.y };
+            if (pin.dir === "L")
+                point.x = Math.min(pin.x - stub, body ? body.x - clearance : pin.x - stub);
+            if (pin.dir === "R")
+                point.x = Math.max(pin.x + stub, body ? body.x + body.w + clearance : pin.x + stub);
+            if (pin.dir === "T")
+                point.y = Math.min(pin.y - stub, body ? body.y - clearance : pin.y - stub);
+            if (pin.dir === "B")
+                point.y = Math.max(pin.y + stub, body ? body.y + body.h + clearance : pin.y + stub);
+            if (!validPoint(point) || !clearSegment(pin, point, index)) {
+                throw new RoutingError(`Pin (${pin.x}, ${pin.y}, ${pin.dir}) has no clear outward escape; move components or enlarge the canvas.`);
+            }
+            return point;
+        };
+        const start = escape(source), finish = escape(target);
+        const hints = (options.waypoints ?? []).map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : p);
+        if (!hints.length && (options.viaX !== undefined || options.midX !== undefined)) {
+            const x = options.viaX ?? options.midX;
+            hints.push({ x, y: start.y }, { x, y: finish.y });
+        }
+        else if (!hints.length && options.viaY !== undefined) {
+            hints.push({ x: start.x, y: options.viaY }, { x: finish.x, y: options.viaY });
+        }
+        if (hints.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y) || !validPoint(p))) {
+            throw new RoutingError("A routing waypoint is obstructed or outside the canvas.");
+        }
+        const checkpoints = [start, ...hints, finish];
+        const xs = new Set(checkpoints.map(p => p.x)), ys = new Set(checkpoints.map(p => p.y));
+        obstacles.forEach(r => { xs.add(r.x); xs.add(r.x + r.w); ys.add(r.y); ys.add(r.y + r.h); });
+        reserved.forEach(route => route.points.forEach(p => {
+            xs.add(p.x - clearance);
+            xs.add(p.x + clearance);
+            ys.add(p.y - clearance);
+            ys.add(p.y + clearance);
+        }));
+        if (options.bounds) {
+            xs.add(options.bounds.x);
+            xs.add(options.bounds.x + options.bounds.w);
+            ys.add(options.bounds.y);
+            ys.add(options.bounds.y + options.bounds.h);
+        }
+        else {
+            // Supply exterior tracks even when there are no component obstacles.
+            xs.add(Math.min(source.x, target.x) - stub);
+            xs.add(Math.max(source.x, target.x) + stub);
+            ys.add(Math.min(source.y, target.y) - stub);
+            ys.add(Math.max(source.y, target.y) + stub);
+        }
+        const xAxis = [...xs].sort((a, b) => a - b), yAxis = [...ys].sort((a, b) => a - b);
+        const columns = xAxis.length, count = columns * yAxis.length;
+        const pointAt = (id) => ({ x: xAxis[id % columns], y: yAxis[Math.floor(id / columns)] });
+        const pointId = (p) => yAxis.indexOf(p.y) * columns + xAxis.indexOf(p.x);
+        const find = (from, to) => {
+            if (samePoint(from, to))
+                return [from];
+            const initial = pointId(from), destination = pointId(to);
+            const distance = new Map([[initial, 0]]);
+            const predecessor = new Map();
+            const queue = new RouteHeap();
+            queue.push({ id: initial, cost: 0, rank: 0 });
+            let current;
+            while ((current = queue.pop())) {
+                if (current.cost !== distance.get(current.id))
+                    continue;
+                const cell = current.id % count, heading = Math.floor(current.id / count);
+                if (cell === destination) {
+                    const result = [pointAt(cell)];
+                    let id = current.id;
+                    while (predecessor.has(id)) {
+                        id = predecessor.get(id);
+                        result.push(pointAt(id % count));
+                    }
+                    return result.reverse();
+                }
+                const point = pointAt(cell), col = cell % columns, row = Math.floor(cell / columns);
+                const candidates = [col > 0 ? cell - 1 : -1, col + 1 < columns ? cell + 1 : -1,
+                    row > 0 ? cell - columns : -1, row + 1 < yAxis.length ? cell + columns : -1];
+                for (const neighbor of candidates) {
+                    if (neighbor < 0)
+                        continue;
+                    const next = pointAt(neighbor);
+                    if (!validPoint(next) || !clearSegment(point, next))
+                        continue;
+                    const direction = point.y === next.y ? 1 : 2;
+                    const id = neighbor + direction * count;
+                    const cost = current.cost + Math.abs(next.x - point.x) + Math.abs(next.y - point.y) +
+                        (heading && heading !== direction ? bendCost : 0);
+                    if (cost >= (distance.get(id) ?? Infinity))
+                        continue;
+                    distance.set(id, cost);
+                    predecessor.set(id, current.id);
+                    queue.push({ id, cost, rank: cost + Math.abs(to.x - next.x) + Math.abs(to.y - next.y) });
+                }
+            }
+            throw new RoutingError("No orthogonal route fits the available space and clearance.");
+        };
+        const points = [source];
+        for (let i = 1; i < checkpoints.length; i++)
+            points.push(...find(checkpoints[i - 1], checkpoints[i]));
+        points.push(target);
+        return simplifyRoute(points);
+    }
+    LogicDraw.orthogonalRoute = orthogonalRoute;
+})(LogicDraw || (LogicDraw = {}));
+/// <reference path="types.ts" />
 /// <reference path="primitives.ts" />
+/// <reference path="routing.ts" />
 /**
- * Intel 8086 Circuit Atlas - OOP Schematic Engine (Auto-Router & Component Graph)
+ * Intel 8086 Circuit Workbench - Schematic Engine and Component Graph
  */
 var LogicDraw;
 (function (LogicDraw) {
@@ -121,12 +366,16 @@ var LogicDraw;
         constructor(owner, id, x, y, dir = "L", label = "", busWidth = 1) {
             this.owner = owner;
             this.id = id;
-            this.x = x;
-            this.y = y;
             this.dir = dir;
             this.label = label;
             this.busWidth = busWidth;
+            this.relativeX = x - owner.x;
+            this.relativeY = y - owner.y;
         }
+        get x() { return this.owner.x + this.relativeX; }
+        set x(value) { this.relativeX = value - this.owner.x; }
+        get y() { return this.owner.y + this.relativeY; }
+        set y(value) { this.relativeY = value - this.owner.y; }
     }
     LogicDraw.Pin = Pin;
     class Component {
@@ -140,6 +389,8 @@ var LogicDraw;
             this.pins = new Map();
         }
         addPin(id, rx, ry, dir = "L", label = "", busWidth = 1) {
+            if (this.pins.has(id))
+                throw new Error(`Duplicate pin '${id}' on component '${this.id}'`);
             const p = new Pin(this, id, this.x + rx, this.y + ry, dir, label, busWidth);
             this.pins.set(id, p);
             return p;
@@ -274,7 +525,7 @@ var LogicDraw;
         }
         addPortPin(id, ry, label, isExternal = false, color = "#0d9488", busWidth = 1) {
             const rx = this.side === "left" ? (isExternal ? 0 : this.w) : (isExternal ? this.w : 0);
-            const dir = this.side === "left" ? "L" : "R";
+            const dir = rx === 0 ? "L" : "R";
             const pin = this.addPin(id, rx, ry, dir, label, busWidth);
             this.pinsList.push({ id, label, color, isExternal, ry, busWidth });
             return pin;
@@ -336,13 +587,27 @@ var LogicDraw;
     }
     LogicDraw.PortBox = PortBox;
     class SchematicCanvas {
-        constructor() {
+        constructor(routing = {}) {
+            this.routing = routing;
             this.backgrounds = [];
             this.buses = [];
             this.components = [];
             this.wires = [];
             this.dots = [];
             this.labels = [];
+            this.connections = [];
+            this.keepouts = [];
+        }
+        /** Resolve connections only after every component is placed. Moving a
+         * component updates its pins and reroutes the next render automatically. */
+        connect(from, to, options = {}) {
+            this.connections.push({ from, to, options });
+            return this;
+        }
+        /** Reserve label/header space as well as component bodies. */
+        reserve(rect) {
+            this.keepouts.push(rect);
+            return this;
         }
         addBackground(svg) {
             this.backgrounds.push(svg);
@@ -357,6 +622,8 @@ var LogicDraw;
             return this;
         }
         addComponent(c) {
+            if (this.components.some(existing => existing.id === c.id))
+                throw new Error(`Duplicate component '${c.id}'`);
             this.components.push(c);
             return this;
         }
@@ -369,6 +636,12 @@ var LogicDraw;
             return this;
         }
         render() {
+            const router = new AutoRouter({
+                ...this.routing,
+                obstacles: [...(this.routing.obstacles ?? []), ...this.keepouts,
+                    ...this.components.filter(c => !(c instanceof SubcircuitCard)).map(c => ({ ...c.bounds(), id: c.id }))],
+            });
+            this.connections.forEach(connection => router.route(connection.from, connection.to, connection.options));
             // Guaranteed CAD Layer Order:
             // 1. Backgrounds & Subcircuit cards
             // 2. Continuous data buses & wordlines
@@ -378,63 +651,44 @@ var LogicDraw;
             // 6. Overlaid text & badges
             return (this.backgrounds.join("") +
                 this.buses.join("") +
-                this.components.map((c) => c.render()).join("") +
+                this.components.map(c => `<g data-component="${LogicDraw.escapeText(c.id).replace(/"/g, "&quot;")}" data-x="${c.x}" data-y="${c.y}" data-width="${c.w}" data-height="${c.h}">${c.render()}</g>`).join("") +
                 this.wires.join("") +
+                router.render() +
                 this.dots.join("") +
                 this.labels.join(""));
         }
     }
     LogicDraw.SchematicCanvas = SchematicCanvas;
     class AutoRouter {
-        constructor() {
+        constructor(options = {}) {
+            this.options = options;
             this.paths = [];
             this.dots = [];
             this.slashes = [];
             this.labels = [];
+            this.connections = [];
+        }
+        get routes() {
+            return this.connections.map(connection => connection.points.map(point => ({ ...point })));
         }
         route(p1, p2, opt = {}) {
             const c = opt.color || LogicDraw.paths.data;
-            const w = opt.width || 1.0;
-            let d = "";
-            if (opt.waypoints && opt.waypoints.length > 0) {
-                d = `M${p1.x} ${p1.y}`;
-                for (const pt of opt.waypoints) {
-                    if (Array.isArray(pt))
-                        d += ` L${pt[0]} ${pt[1]}`;
-                    else if (typeof pt === "object" && pt.x !== undefined)
-                        d += ` L${pt.x} ${pt.y}`;
-                }
-                d += ` L${p2.x} ${p2.y}`;
-            }
-            else if (p1.y === p2.y) {
-                d = `M${p1.x} ${p1.y}H${p2.x}`;
-            }
-            else if (p1.x === p2.x) {
-                d = `M${p1.x} ${p1.y}V${p2.y}`;
-            }
-            else if (opt.viaX !== undefined) {
-                d = `M${p1.x} ${p1.y}H${opt.viaX}V${p2.y}H${p2.x}`;
-            }
-            else if (opt.viaY !== undefined) {
-                d = `M${p1.x} ${p1.y}V${opt.viaY}H${p2.x}V${p2.y}`;
-            }
-            else if (p1.dir === "R" && p2.dir === "L") {
-                const midX = opt.midX || (p1.x + p2.x) / 2;
-                d = `M${p1.x} ${p1.y}H${midX}V${p2.y}H${p2.x}`;
-            }
-            else if ((p1.dir === "B" || p1.dir === "T") && p2.dir === "L") {
-                d = `M${p1.x} ${p1.y}V${p2.y}H${p2.x}`;
-            }
-            else if (p1.dir === "R" && (p2.dir === "T" || p2.dir === "B")) {
-                d = `M${p1.x} ${p1.y}H${p2.x}V${p2.y}`;
-            }
-            else {
-                d = `M${p1.x} ${p1.y}H${p2.x}V${p2.y}`;
-            }
-            this.paths.push(LogicDraw.P(d, c, w));
+            const w = opt.width ?? 1.0;
+            const points = LogicDraw.orthogonalRoute(p1, p2, { ...this.options, ...opt }, this.connections);
+            const net = opt.net ?? `wire-${this.connections.length}`;
+            this.connections.push({ points, net });
+            this.paths.push(LogicDraw.P(LogicDraw.routePath(points), c, w, "none", `data-net="${LogicDraw.escapeText(net).replace(/"/g, "&quot;")}"`));
             if (opt.busSlash) {
-                const sx = opt.slashX !== undefined ? opt.slashX : (p1.x + p2.x) / 2;
-                const sy = opt.slashY !== undefined ? opt.slashY : (p1.y + p2.y) / 2;
+                // Put annotations on an actual segment, not the endpoints' midpoint.
+                let segment = 1;
+                for (let i = 2; i < points.length; i++) {
+                    const length = (index) => Math.abs(points[index].x - points[index - 1].x) + Math.abs(points[index].y - points[index - 1].y);
+                    if (length(i) > length(segment))
+                        segment = i;
+                }
+                const a = points[segment - 1] ?? p1, b = points[segment] ?? p2;
+                const sx = opt.slashX ?? (a.x + b.x) / 2;
+                const sy = opt.slashY ?? (a.y + b.y) / 2;
                 this.slashes.push(LogicDraw.busSlash(sx, sy, opt.busSlash, c));
             }
             return this;
@@ -443,15 +697,31 @@ var LogicDraw;
             const c = opt.color || LogicDraw.paths.data;
             const fromX = Array.isArray(from) ? from[0] : from.x;
             const fromY = Array.isArray(from) ? from[1] : from.y;
-            if (opt.dot !== false) {
-                this.dots.push(LogicDraw.dot(fromX, fromY, c, opt.dotRadius || 1.6));
+            const parent = this.connections.find(connection => connection.points.some((p, i) => i > 0 &&
+                this.onSegment(fromX, fromY, connection.points[i - 1], p)));
+            if (opt.dot !== false && !parent)
+                throw new LogicDraw.RoutingError("A branch junction must lie on an existing routed wire.");
+            if (parent && opt.dot !== false && opt.net !== undefined && opt.net !== parent.net) {
+                throw new LogicDraw.RoutingError("A branch junction cannot join different signal nets.");
             }
-            const startPin = { x: fromX, y: fromY, dir: opt.dir || "B" };
-            return this.route(startPin, to, opt);
+            const startPin = { x: fromX, y: fromY, dir: opt.dir };
+            this.route(startPin, to, { ...opt, net: opt.net ?? parent?.net });
+            if (opt.dot !== false)
+                this.dots.push(LogicDraw.dot(fromX, fromY, c, opt.dotRadius ?? 1.6));
+            return this;
         }
         addDot(x, y, color = LogicDraw.paths.data, r = 1.8) {
+            const wires = this.connections.filter(connection => connection.points.some((p, i) => i > 0 &&
+                this.onSegment(x, y, connection.points[i - 1], p)));
+            if (wires.length < 2 || new Set(wires.map(wire => wire.net)).size !== 1) {
+                throw new LogicDraw.RoutingError("A junction dot requires intersecting wires of the same net.");
+            }
             this.dots.push(LogicDraw.dot(x, y, color, r));
             return this;
+        }
+        onSegment(x, y, a, b) {
+            return (a.x === b.x && x === a.x && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) ||
+                (a.y === b.y && y === a.y && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x));
         }
         addSlash(x, y, width = "4", color = LogicDraw.paths.data) {
             this.slashes.push(LogicDraw.busSlash(x, y, width, color));
@@ -471,7 +741,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Dual-Port Register File (AX..DI)
+ * Intel 8086 Circuit Workbench - 16-Bit Dual-Port Register File (AX..DI)
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, DffCell, TriStateBuffer, LogicGate.
  * Exactly 128 Bascules D (16 bits × 8 registers) + 256 Tri-State Drivers.
  * Guaranteed Layer-Ordering: Zero wire masking, zero floating dots, zero wire collisions.
@@ -824,7 +1094,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Parallel ALU & 4-Bit CLA Architecture
+ * Intel 8086 Circuit Workbench - 16-Bit Parallel ALU & 4-Bit CLA Architecture
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, MuxComponent.
  * Full Discrete 16-Bit Bit-Slice Matrix (Bit 15 down to Bit 0) organized into 4 CLA Nibble Blocks.
  * Mathematically Unified Macro-Micro Interconnects:
@@ -849,8 +1119,10 @@ var LogicDraw;
         const calc = typeof cpu !== "undefined" && cpu.calculate
             ? cpu.calculate()
             : { word: 0, flags: { CF: 0, PF: 0, AF: 0, ZF: 0, SF: 0, OF: 0 } };
-        const wordA = s.tmpA ?? s.ax ?? 0;
-        const wordB = s.tmpB ?? s.bx ?? 0;
+        const inputs = typeof cpu !== "undefined" && cpu.inputs
+            ? cpu.inputs() : [s.a ?? s.ax ?? 0, s.b ?? s.bx ?? 0];
+        const wordA = s.tmpA ?? inputs[0];
+        const wordB = s.tmpB ?? inputs[1];
         const sWord = calc.word ?? 0;
         const flags = calc.flags ?? { CF: 0, PF: 0, AF: 0, ZF: 0, SF: 0, OF: 0 };
         const opStr = (s.op ?? "ADD").toUpperCase();
@@ -1304,7 +1576,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - 16-Bit Status & Control Flags Register (FR)
+ * Intel 8086 Circuit Workbench - 16-Bit Status & Control Flags Register (FR)
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, DffCell, LogicGate.
  * Full 16-Bit Flip-Flop Register Array:
  *   - 6 Arithmetic Status Flags: CF (bit 0), PF (bit 2), AF (bit 4), ZF (bit 6), SF (bit 7), OF (bit 11)
@@ -1555,7 +1827,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - Bus Interface Unit (BIU) Modular Engine
+ * Intel 8086 Circuit Workbench - Bus Interface Unit (BIU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate.
  * Units:
  *   1. segLogic (16-bit Segment Registers CS, DS, SS, ES)
@@ -2539,7 +2811,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - Execution Unit (EU) Modular Engine
+ * Intel 8086 Circuit Workbench - Execution Unit (EU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, TriStateBuffer, DffCell.
  * Units:
  *   1. internalBusLogic (16-Bit Internal Data Bus & Synchronous Crossbar Taps)
@@ -2681,111 +2953,68 @@ var LogicDraw;
     // Viewport: 468 x 216
     // =========================================================================
     function tempsLogic(s) {
-        const canvas = new LogicDraw.SchematicCanvas();
+        const canvas = new LogicDraw.SchematicCanvas({ bounds: { x: 6, y: 6, w: 456, h: 210 } });
         const phase = (s.phase || 0) % 8;
-        const aVal = s.a ?? s.ax ?? 0;
-        const bVal = s.b ?? s.bx ?? 0;
-        const cVal = s.c ?? 0;
         const latches = [
-            { id: "tmpa", name: "tmpA", val: aVal, cx: 75, en: phase === 3, col: "#0284c7" },
-            { id: "tmpb", name: "tmpB", val: bVal, cx: 205, en: phase === 4, col: "#059669" },
-            { id: "tmpc", name: "tmpC", val: cVal, cx: 335, en: phase === 6, col: "#d97706" }
+            { id: "tmpa", name: "tmpA", val: s.a ?? s.ax ?? 0, cx: 75, en: phase === 3, col: "#0284c7" },
+            { id: "tmpb", name: "tmpB", val: s.b ?? s.bx ?? 0, cx: 205, en: phase === 4, col: "#059669" },
+            { id: "tmpc", name: "tmpC", val: s.c ?? 0, cx: 335, en: phase === 6, col: "#d97706" },
         ];
-        // 0. Top System Title Banner
         canvas.addBackground(LogicDraw.R(10, 6, 448, 14, "#f8fafc", "#cbd5e1", 2, 0.8));
-        canvas.addLabel(18, 16, "INTEL 8086 OPERAND TEMPORARY LATCHES · tmpA, tmpB, tmpC", 6.8, 'font-weight="bold" fill="#0f172a"');
-        canvas.addLabel(450, 16, "16-BIT TRANSPARENT D-LATCH ARRAYS", 5.6, 'text-anchor="end" font-weight="bold" fill="#0d9488"');
-        // 1. Data In Highway (Y = 22, X = 20 to 455)
-        // Matches architecture.js pin: lx = 455, ly = 22
-        canvas.addBus(LogicDraw.P("M20 22H455", LogicDraw.paths.data, 2.0));
-        canvas.addWire(LogicDraw.busSlash(435, 22, "16", LogicDraw.paths.data));
-        canvas.addLabel(430, 16, "D_IN[15:0]", 5.2, 'text-anchor="end" font-weight="bold" fill="#0d9488"');
-        // Right Port Box container (x = 395, w = 60 -> contact pad at 455, 22)
-        const portIn = new LogicDraw.PortBox("port_temps_in", 395, 12, 60, 22, "D_IN", "right", "input", "#f0fdf4", "#15803d");
-        portIn.addPortPin("din", 10, "D_IN[15:0]", true, LogicDraw.paths.data, 16);
-        canvas.addComponent(portIn);
-        // 2. Control Enable Strobe Rail (Y = 175, X = 20 to 400)
-        canvas.addBus(LogicDraw.P("M20 175H400", LogicDraw.paths.control, 1.2));
-        canvas.addLabel(22, 171, "LE[2:0] STROBES", 4.8, 'font-weight="bold" fill="#7c3aed"');
-        // 3. Three Latch Banks
-        latches.forEach((l) => {
-            const cx = l.cx;
-            const bx = cx - 59;
-            const by = 28;
-            const bw = 118;
-            const bh = 142;
-            const isEn = l.en;
-            const bdrCol = isEn ? l.col : "#cbd5e1";
-            const bgCol = isEn ? "#f0fdf4" : "#ffffff";
-            // Card Background (height 12 avoids header occlusion rule [13, 14, 18])
-            canvas.addBackground(LogicDraw.R(bx, by, bw, bh, bgCol, bdrCol, 3, isEn ? 1.4 : 0.8));
-            canvas.addBackground(LogicDraw.R(bx, by, bw, 12, isEn ? "#dcfce7" : "#f8fafc", bdrCol, 2, 0.8));
-            canvas.addLabel(bx + 6, by + 9.5, l.name + " [15:0]", 5.6, `font-weight="bold" fill="${isEn ? l.col : '#0f172a'}"`);
-            canvas.addLabel(bx + bw - 6, by + 9.5, LogicDraw.hex(l.val, 4) + "h", 5.6, `text-anchor="end" font-weight="bold" fill="${l.col}"`);
-            // Zone 1 (Input & LE Drops):
-            // Data in drop: at cx - 40, Y = 22 down to Y = 62
-            canvas.addWire(LogicDraw.P(`M${cx - 40} 22V62`, LogicDraw.paths.data, 1.2));
-            canvas.addDot(cx - 40, 22, LogicDraw.paths.data, 1.8);
-            // Turn right to Steering NAND 1
-            canvas.addWire(LogicDraw.P(`M${cx - 40} 62H${cx - 24}`, LogicDraw.paths.data, 1.0));
-            // Branch down to Inverter for Steering NAND 2
-            canvas.addWire(LogicDraw.P(`M${cx - 40} 62V78H${cx - 30}`, LogicDraw.paths.data, 1.0));
-            canvas.addDot(cx - 40, 62, LogicDraw.paths.data, 1.4);
-            // Inverter for lower data bit
-            const invD = new LogicDraw.LogicGate(`inv_${l.id}`, cx - 30, 74, "inv", 8, 8, isEn);
-            canvas.addComponent(invD);
-            canvas.addWire(LogicDraw.P(`M${cx - 22} 78H${cx - 24}`, LogicDraw.paths.data, 1.0));
-            // LE Strobe drop: at cx - 48, rising from Y = 175 to Y = 66
-            canvas.addWire(LogicDraw.P(`M${cx - 48} 175V66`, LogicDraw.paths.control, 1.0));
-            canvas.addDot(cx - 48, 175, LogicDraw.paths.control, 1.6);
-            canvas.addWire(LogicDraw.P(`M${cx - 48} 66H${cx - 24}`, LogicDraw.paths.control, 1.0));
-            canvas.addWire(LogicDraw.P(`M${cx - 48} 66V82H${cx - 24}`, LogicDraw.paths.control, 1.0));
-            canvas.addDot(cx - 48, 66, LogicDraw.paths.control, 1.4);
-            // Zone 2 (Discrete Gate Bodies):
-            // Steering NANDs (Column 1):
-            const nand1 = new LogicDraw.LogicGate(`nand1_${l.id}`, cx - 24, 59, "nand", 14, 10, isEn);
-            const nand2 = new LogicDraw.LogicGate(`nand2_${l.id}`, cx - 24, 75, "nand", 14, 10, isEn);
-            canvas.addComponent(nand1);
-            canvas.addComponent(nand2);
-            // Storage NANDs (Column 2):
-            const nand3 = new LogicDraw.LogicGate(`nand3_${l.id}`, cx + 8, 59, "nand", 14, 10, true);
-            const nand4 = new LogicDraw.LogicGate(`nand4_${l.id}`, cx + 8, 75, "nand", 14, 10, false);
-            canvas.addComponent(nand3);
-            canvas.addComponent(nand4);
-            // Zone 3: Interconnects & Cross-Coupling Feedback
-            // Steering 1 output (cx - 10, 64) -> NAND 3 in0 (cx + 8, 62)
-            canvas.addWire(LogicDraw.P(`M${cx - 10} 64H${cx - 2}V62H${cx + 8}`, LogicDraw.paths.data, 1.0));
-            // Steering 2 output (cx - 10, 80) -> NAND 4 in1 (cx + 8, 82)
-            canvas.addWire(LogicDraw.P(`M${cx - 10} 80H${cx - 2}V82H${cx + 8}`, LogicDraw.paths.data, 1.0));
-            // Cross coupling feedback:
-            // NAND 3 output (cx + 22, 64) drops at cx + 26 down to Y = 70 then into NAND 4 in0 (cx + 8, 77)
-            canvas.addWire(LogicDraw.P(`M${cx + 22} 64H${cx + 26}V70H${cx + 2}V77H${cx + 8}`, LogicDraw.paths.data, 1.0));
-            canvas.addDot(cx + 26, 64, LogicDraw.paths.data, 1.4);
-            // NAND 4 output (cx + 22, 80) rises at cx + 30 up to Y = 74 then into NAND 3 in1 (cx + 8, 67)
-            canvas.addWire(LogicDraw.P(`M${cx + 22} 80H${cx + 30}V74H${cx + 2}V67H${cx + 8}`, LogicDraw.paths.data, 1.0));
-            canvas.addDot(cx + 30, 80, LogicDraw.paths.data, 1.4);
-            // 16-Bit Discrete Bitcell Storage Display
-            // Two rows of 8 cells: Row 0 at Y = 98, Row 1 at Y = 112
+        canvas.addLabel(18, 16, "OPERAND TEMPORARY LATCHES · THREE 16-BIT TRANSPARENT D-LATCH BANKS", 6.3, 'font-weight="bold"');
+        canvas.addBus(LogicDraw.P("M12 22H455", LogicDraw.paths.data, 2.0));
+        canvas.addBackground(LogicDraw.R(451, 18, 8, 8, "#fed7aa", "#c2410c", 1, 1));
+        canvas.addDot(455, 22, LogicDraw.paths.data, 1.8);
+        canvas.addBus(LogicDraw.P("M20 180H400", LogicDraw.paths.control, 1.2));
+        canvas.addLabel(398, 176, "LE[2:0]", 5, 'text-anchor="end"');
+        for (const bank of latches) {
+            const x = bank.cx;
+            const color = bank.en ? bank.col : "#94a3b8";
+            canvas.addBackground(LogicDraw.R(x - 59, 28, 118, 142, "#ffffff", "#cbd5e1", 3, 0.8));
+            canvas.addBackground(LogicDraw.R(x - 59, 28, 118, 12, "#f1f5f9", "#cbd5e1", 2, 0.8));
+            canvas.addLabel(x - 53, 37, `${bank.name} [15:0]`, 5.6, 'font-weight="bold"');
+            canvas.addLabel(x + 53, 37, LogicDraw.hex(bank.val) + "h", 5.6, 'text-anchor="end" font-weight="bold"');
+            canvas.reserve({ x: x - 59, y: 28, w: 118, h: 12 });
+            // Each bank uses the same connected NAND latch, translated in X. Pins,
+            // gates and all feedback routes move together; no duplicated wire pixels.
+            const inverter = new LogicDraw.LogicGate(`${bank.id}_inv`, x - 46, 100, "inv", 10, 10, bank.en);
+            const steerSet = new LogicDraw.LogicGate(`${bank.id}_set`, x - 18, 52, "nand", 12, 16, bank.en);
+            const steerReset = new LogicDraw.LogicGate(`${bank.id}_reset`, x - 18, 100, "nand", 12, 16, bank.en);
+            const storeQ = new LogicDraw.LogicGate(`${bank.id}_q`, x + 22, 52, "nand", 12, 16, Boolean(bank.val & 1));
+            const storeNotQ = new LogicDraw.LogicGate(`${bank.id}_notq`, x + 22, 100, "nand", 12, 16, !(bank.val & 1));
+            [inverter, steerSet, steerReset, storeQ, storeNotQ].forEach(gate => canvas.addComponent(gate));
+            const data = { x: x - 63, y: 22 };
+            const enable = { x: x - 55, y: 180 };
+            const net = (name, netColor = color) => ({ net: `${bank.id}.${name}`, color: netColor, width: 1 });
+            canvas.connect(data, steerSet.pin("in0"), net("d", LogicDraw.paths.data));
+            canvas.connect(data, inverter.pin("in0"), net("d", LogicDraw.paths.data));
+            canvas.connect(enable, steerSet.pin("in1"), net("le", LogicDraw.paths.control));
+            canvas.connect(enable, steerReset.pin("in1"), net("le", LogicDraw.paths.control));
+            canvas.connect(inverter.pin("out"), steerReset.pin("in0"), net("notd"));
+            canvas.connect(steerSet.pin("out"), storeQ.pin("in0"), net("set"));
+            canvas.connect(steerReset.pin("out"), storeNotQ.pin("in1"), net("reset"));
+            canvas.connect(storeQ.pin("out"), storeNotQ.pin("in0"), net("q"));
+            canvas.connect(storeNotQ.pin("out"), storeQ.pin("in1"), net("notq"));
+            canvas.connect(storeQ.pin("out"), { x, y: 188 }, net("q", bank.col));
+            canvas.addDot(data.x, data.y, LogicDraw.paths.data, 1.5);
+            canvas.addDot(enable.x, enable.y, LogicDraw.paths.control, 1.5);
+            // Register-value readout is a reserved region, not an obstacle discovered
+            // by inspecting SVG after drawing.
+            canvas.reserve({ x: x - 47, y: 138, w: 95, h: 26 });
             for (let bit = 15; bit >= 0; bit--) {
                 const row = bit >= 8 ? 0 : 1;
-                const col = bit >= 8 ? (15 - bit) : (7 - bit);
-                const cellX = (cx - 47) + col * 12;
-                const cellY = 98 + row * 14;
-                const b = (l.val >>> bit) & 1;
-                const bCol = b ? "#16a34a" : "#64748b";
-                const bFill = b ? "#dcfce7" : "#ffffff";
-                canvas.addBackground(LogicDraw.R(cellX, cellY, 11, 11, bFill, b ? "#16a34a" : "#cbd5e1", 2, 0.8));
-                canvas.addLabel(cellX + 5.5, cellY + 8, String(b), 4.8, `text-anchor="middle" font-weight="bold" fill="${bCol}"`);
+                const column = bit >= 8 ? 15 - bit : 7 - bit;
+                const bx = x - 47 + column * 12, by = 138 + row * 14;
+                const value = (bank.val >>> bit) & 1;
+                canvas.addBackground(LogicDraw.R(bx, by, 11, 11, value ? "#dcfce7" : "#ffffff", "#cbd5e1", 1, 0.6));
+                canvas.addLabel(bx + 5.5, by + 8, value, 4.8, 'text-anchor="middle"');
             }
-            canvas.addLabel(bx + 8, 134, "BIT STORAGE [15:0]", 4.0, 'font-weight="bold" fill="#64748b"');
-            // Output Bus: drops from cx at Y = 140 straight down to bottom terminal pad (cx, 216)
-            // Matches architecture.js pin: tmpA -> (75, 216), tmpB -> (205, 216), tmpC -> (335, 216)
-            canvas.addBus(LogicDraw.P(`M${cx} 140V216`, l.col, 2.0));
-            canvas.addBackground(LogicDraw.R(cx - 5, 212, 10, 8, "#fed7aa", "#c2410c", 2, 1.0));
-            canvas.addDot(cx, 216, l.col, 2.2);
-            canvas.addWire(LogicDraw.busSlash(cx, 195, "16", l.col));
-            canvas.addLabel(cx + 4, 205, l.name + "[15:0]", 5.2, `font-weight="bold" fill="${l.col}"`);
-        });
+            canvas.addBus(LogicDraw.P(`M${x} 188V210`, bank.col, 2));
+            canvas.addBackground(LogicDraw.R(x - 5, 206, 10, 8, "#fed7aa", "#c2410c", 2, 1));
+            canvas.addDot(x, 210, bank.col, 2);
+            canvas.addWire(LogicDraw.busSlash(x, 195, "16", bank.col));
+            canvas.addLabel(x + 4, 205, `${bank.name}[15:0]`, 5.2, `fill="${bank.col}"`);
+        }
         return canvas.render();
     }
     LogicDraw.tempsLogic = tempsLogic;
@@ -3058,7 +3287,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - Control Unit (CU) Modular Engine
+ * Intel 8086 Circuit Workbench - Control Unit (CU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, DffCell.
  *
  * 11 Target Units:
@@ -3799,7 +4028,7 @@ var LogicDraw;
             canvas.addWire(LogicDraw.P(`M${cx + 4} 36V78H${cx + 10}`, "#16a34a", 1.0));
             canvas.addDot(cx + 4, 36, "#16a34a", 1.5);
             // Discrete DffCell core
-            const dff = new LogicDraw.DffCell(`seq_ff_${i}`, cx + 10, 72, 20, 22, q[i], clock);
+            const dff = new LogicDraw.DffCell(`seq_ff_${i}`, cx + 10, 72, 20, 22, q[i], Boolean(clock));
             canvas.addComponent(dff);
             // Output tap to Y = 95 collector bus
             canvas.addWire(LogicDraw.P(`M${cx + 30} 83H${cx + 36}V95`, q[i] ? LogicDraw.paths.high : "#94a3b8", 1.0));
@@ -3909,7 +4138,7 @@ var LogicDraw;
 /// <reference path="../primitives.ts" />
 /// <reference path="../engine.ts" />
 /**
- * Intel 8086 Circuit Atlas - System Hardware Board (SYS) Subsystem Modular Engine
+ * Intel 8086 Circuit Workbench - System Hardware Board (SYS) Subsystem Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, LogicGate, DffCell, TriStateBuffer.
  *
  * 6 Target Units:
@@ -4747,7 +4976,7 @@ var LogicDraw;
 /// <reference path="modules/cu.ts" />
 /// <reference path="modules/sys.ts" />
 /**
- * Intel 8086 Circuit Atlas - Central Registry & Browser/Node Interface
+ * Intel 8086 Circuit Workbench - Central Registry & Browser/Node Interface
  */
 var LogicDraw;
 (function (LogicDraw) {
@@ -4858,6 +5087,9 @@ var LogicDraw;
         bin: LogicDraw.bin,
         paths: LogicDraw.paths,
         AutoRouter: LogicDraw.AutoRouter,
+        RoutingError: LogicDraw.RoutingError,
+        orthogonalRoute: LogicDraw.orthogonalRoute,
+        segmentHitsRect: LogicDraw.segmentHitsRect,
         Component: LogicDraw.Component,
         LogicGate: LogicDraw.LogicGate,
         MuxComponent: LogicDraw.MuxComponent,
@@ -4868,18 +5100,10 @@ var LogicDraw;
         SchematicCanvas: LogicDraw.SchematicCanvas,
         Pin: LogicDraw.Pin,
     };
-    const target = typeof window !== "undefined"
-        ? window
-        : typeof globalThis !== "undefined"
-            ? globalThis
-            : typeof global !== "undefined"
-                ? global
-                : {};
-    target.logicDraw = Object.assign(api, components);
-    if (typeof globalThis !== "undefined" && globalThis !== target) {
-        globalThis.logicDraw = target.logicDraw;
+    const exposed = Object.assign(api, components);
+    const target = (typeof window !== "undefined" ? window : globalThis);
+    target.logicDraw = exposed;
+    if (typeof globalThis !== "undefined") {
+        globalThis.logicDraw = exposed;
     }
 })(LogicDraw || (LogicDraw = {}));
-/// <reference path="../types.ts" />
-/// <reference path="../primitives.ts" />
-/// <reference path="../engine.ts" />

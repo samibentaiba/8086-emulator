@@ -9,12 +9,10 @@
 /// <reference path="modules/cu.ts" />
 /// <reference path="modules/sys.ts" />
 /**
- * Intel 8086 Circuit Atlas - Central Registry & Browser/Node Interface
+ * Intel 8086 Circuit Workbench - Central Registry & Browser/Node Interface
  */
 namespace LogicDraw {
-  declare const cpu: any;
-
-  const components: Record<string, (s: any, bit?: number) => any> = {
+  const components: Record<string, (s: SchematicState, bit?: number) => Workbench.CircuitView> = {
     regs: (s) => ({ body: registersLogic(s), vw: 1280, vh: 560, title: "16-BIT REGISTER FILE · DUAL PORT" }),
     flags: (s) => ({ body: flagsLogic(s), vw: 1280, vh: 420, title: "16-BIT STATUS & CONTROL FLAGS REGISTER (FR)" }),
     temps: (s) => ({ body: tempsLogic(s), vw: 468, vh: 216, title: "OPERAND TEMPORARY LATCHES" }),
@@ -51,10 +49,7 @@ namespace LogicDraw {
     bootrom: (s) => ({ body: bootromLogic(s), vw: 400, vh: 175, title: "2764 BOOT ROM (0xFFFF0)" }),
   };
 
-  declare const window: any;
-  declare const global: any;
-
-  export function getComponentLogic(id: string, s: any, bit: number = 0) {
+  export function getComponentLogic(id: string, s: SchematicState, bit: number = 0) {
     const fn = components[id];
     return fn ? fn(s, bit) : null;
   }
@@ -67,7 +62,7 @@ namespace LogicDraw {
     return Object.keys(components);
   }
 
-  const api: Record<string, any> = {
+  const api = {
     adderLogic,
     decoderLogic,
     sequencerLogic,
@@ -125,6 +120,9 @@ namespace LogicDraw {
     bin,
     paths,
     AutoRouter,
+    RoutingError,
+    orthogonalRoute,
+    segmentHitsRect,
     Component,
     LogicGate,
     MuxComponent,
@@ -136,17 +134,11 @@ namespace LogicDraw {
     Pin,
   };
 
-  const target: any =
-    typeof window !== "undefined"
-      ? window
-      : typeof globalThis !== "undefined"
-      ? globalThis
-      : typeof global !== "undefined"
-      ? global
-      : {};
-
-  target.logicDraw = Object.assign(api, components);
-  if (typeof globalThis !== "undefined" && (globalThis as any) !== target) {
-    (globalThis as any).logicDraw = target.logicDraw;
+  const exposed = Object.assign(api, components);
+  type Host = { logicDraw: typeof exposed };
+  const target = (typeof window !== "undefined" ? window : globalThis) as unknown as Host;
+  target.logicDraw = exposed;
+  if (typeof globalThis !== "undefined") {
+    (globalThis as unknown as Host).logicDraw = exposed;
   }
 }

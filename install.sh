@@ -41,7 +41,7 @@ echo "✓ CLI launchers installed into $BIN_DIR:"
 echo "    - emu8086         (Unified terminal command)"
 echo "    - emu8086-tui     (Neovim-style interactive modal TUI)"
 echo "    - emu8086-gui     (PyQt5 desktop workbench)"
-echo "    - emu8086-circuit (8086 Circuit Atlas interactive schematic)"
+echo "    - emu8086-circuit (8086 Circuit Workbench interactive schematic)"
 echo "    - emu8086-digital (8086 Digital Logic pure gate-level workbench)"
 
 # 4. Install desktop icon if present

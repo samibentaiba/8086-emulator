@@ -34,11 +34,11 @@ def main():
     parser.add_argument("-n", "--nodebug", action="store_true", help="Run without interactive debug prompts (continuous run)")
     parser.add_argument("-i", "--interrupt", action="store_true", help="Print interrupt execution information")
     parser.add_argument("-g", "--gui-windows", action="store_true", help="Spawn external GUI visualizer windows for peripherals")
-    parser.add_argument("-c", "--circuit", action="store_true", help="Launch interactive 8086 Circuit Atlas schematic workbench in browser")
+    parser.add_argument("-c", "--circuit", action="store_true", help="Launch the interactive 8086 Circuit Workbench in a browser")
 
     args = parser.parse_args()
 
-    # If Circuit Atlas requested, launch the browser-based schematic workbench
+    # If the circuit view is requested, launch the browser-based workbench.
     if args.circuit:
         from circuit_server import launch_circuit
         launch_circuit()

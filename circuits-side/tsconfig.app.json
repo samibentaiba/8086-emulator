@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "None",
+    "outDir": ".",
+    "rootDir": "src",
+    "strict": true,
+    "noEmitOnError": true,
+    "types": [],
+    "lib": ["DOM", "ES2022"]
+  },
+  "files": ["src/workbench-types.d.ts", "src/model.ts", "src/render-engine.ts", "src/architecture.ts", "src/app.ts"]
+}

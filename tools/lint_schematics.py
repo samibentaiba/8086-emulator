@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Intel 8086 Circuit Atlas - CAD Schematic Linter & Anti-Pattern Inspector
+Intel 8086 Circuit Workbench - CAD Schematic Linter & Anti-Pattern Inspector
 Scans rendered SVG outputs from diagram.js to enforce the 6 Cardinal CAD Invariants:
   1. Zero Gate & DFF Body Penetration (no vertical wire cuts through gate/latch bounding boxes)
   2. 3-Zone Planar Routing Law (dedicated zones for drops, gates, and MUX/results)
@@ -155,7 +155,7 @@ def extract_circuits(target_components=None):
     console.log(JSON.stringify(results));
     """
     cmd = [NODE_BIN, "-e", script, DIAGRAM_JS, json.dumps(target_components)]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", check=True)
     return json.loads(res.stdout)
 
 def parse_path_segments(d):
@@ -381,7 +381,7 @@ def lint_circuit(name, data):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Intel 8086 Circuit Atlas - CAD Schematic Linter & Anti-Pattern Inspector"
+        description="Intel 8086 Circuit Workbench - CAD Schematic Linter & Anti-Pattern Inspector"
     )
     parser.add_argument(
         "--all",
@@ -447,11 +447,16 @@ def resolve_target_units(args):
     return selected
 
 def main():
+    # Preserve the caller's console encoding; escape unsupported status symbols
+    # when Windows redirects output through a legacy code page.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     args = parse_args()
     target_units = resolve_target_units(args)
 
     print("=" * 70)
-    print("Intel 8086 Circuit Atlas - CAD Schematic Inspector")
+    print("Intel 8086 Circuit Workbench - CAD Schematic Inspector")
     if target_units == GOLDEN_UNITS and not args.units and not args.subsystem and not args.all:
         print("[INFO] Auditing default golden units: alu, regs, flags.")
         print("       (Use --all for all 34 units, or --subsystem <golden|biu|eu|cu|sys>, or --units <list>)")

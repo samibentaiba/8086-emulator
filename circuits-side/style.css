@@ -28,21 +28,27 @@ html, body {
   overflow: hidden;
   background: var(--cad-bg);
   color: var(--cad-text);
-  font: 13px var(--sans);
+  font: 16px var(--sans);
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
 }
 
 /* =========================================================================
    TOP APPLICATION BAR (CAD HEADER)
    ========================================================================= */
 .appbar {
-  height: 50px;
+  min-height: 64px;
   background: var(--cad-surface);
   border-bottom: 1px solid var(--cad-border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 10px 16px;
   gap: 16px;
   user-select: none;
   z-index: 100;
@@ -52,7 +58,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 220px;
+  flex-shrink: 0;
 }
 
 .brand svg {
@@ -68,14 +74,14 @@ html, body {
 
 .chip-title {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: #38bdf8;
 }
 
 .chip-sub {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--cad-text-muted);
 }
 
@@ -85,10 +91,11 @@ html, body {
   gap: 8px;
   flex: 1;
   max-width: 520px;
+  min-width: 0;
 }
 
 .jump-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--cad-text-muted);
   white-space: nowrap;
@@ -96,13 +103,18 @@ html, body {
 
 #find {
   width: 100%;
-  height: 32px;
+  height: 36px;
+  min-width: 0;
   background: #1e293b;
   color: #f8fafc;
   border: 1px solid var(--cad-border);
   border-radius: 4px;
-  padding: 0 10px;
-  font-size: 12.5px;
+  padding: 0 30px 0 10px;
+  font-size: 14px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%2394a3b8' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   font-family: var(--sans);
   cursor: pointer;
   outline: none;
@@ -111,7 +123,7 @@ html, body {
 
 #find:hover, #find:focus {
   border-color: #38bdf8;
-  background: #243248;
+  background-color: #243248;
 }
 
 #find optgroup {
@@ -133,8 +145,8 @@ html, body {
 }
 
 .cad-btn {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   background: #1e293b;
   color: #f8fafc;
   border: 1px solid var(--cad-border);
@@ -163,7 +175,7 @@ html, body {
 
 #zoom {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--cad-green);
   min-width: 44px;
@@ -171,13 +183,13 @@ html, body {
 }
 
 .cad-btn-text {
-  height: 30px;
+  height: 36px;
   padding: 0 12px;
   background: #1e293b;
   color: #38bdf8;
   border: 1px solid var(--cad-border);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -198,8 +210,19 @@ html, body {
   font-size: 12px;
   color: var(--cad-text-muted);
   white-space: nowrap;
-  min-width: 180px;
+  min-width: 0;
+  max-width: 350px;
   justify-content: flex-end;
+}
+
+#crumbpart {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button:focus-visible, select:focus-visible, #canvas:focus-visible {
+  outline: 2px solid var(--cad-blue);
+  outline-offset: -2px;
 }
 
 .crumb button {
@@ -233,8 +256,9 @@ html, body {
    MAIN CAD WORKBENCH CANVAS
    ========================================================================= */
 #workbench {
-  width: 100vw;
-  height: calc(100vh - 78px);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   background: var(--cad-bg);
@@ -264,13 +288,13 @@ html, body {
    BOTTOM LEGEND & STATUS BAR
    ========================================================================= */
 .boardlegend {
-  height: 28px;
+  min-height: 32px;
   background: #090d16;
   border-top: 1px solid var(--cad-border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 6px 16px;
   font-size: 11px;
   color: var(--cad-text-muted);
   user-select: none;
@@ -281,6 +305,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .legend-items span {
@@ -288,7 +313,7 @@ html, body {
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .legend-items .sw {
@@ -336,10 +361,7 @@ html, body {
 }
 
 /* Responsive adjustments */
-@media (max-width: 1024px) {
-  .brand-text {
-    display: none;
-  }
+@media (max-width: 1400px) {
   .crumb {
     display: none;
   }
@@ -349,10 +371,35 @@ html, body {
 }
 
 @media (max-width: 768px) {
-  .nav-cluster {
-    max-width: 200px;
+  .appbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
   }
-  .cad-btn-text {
-    display: none;
+  .nav-cluster {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .brand svg { display: none; }
+  .chip-title { font-size: 14px; }
+  .cad-btn-text { padding: 0 8px; }
+  .zoom-cluster { gap: 4px; }
+  .legend-items { gap: 8px 14px; }
+  .boardlegend { padding: 6px 12px; }
+}
+
+@media (max-width: 420px) {
+  .appbar { gap: 8px; }
+  .brand { flex-basis: 100%; }
+  .brand-text { flex-direction: row; align-items: center; gap: 10px; }
+  .zoom-cluster { width: 100%; }
+  .cad-btn-text { flex: 1; }
+  .legend-items span { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
   }
 }

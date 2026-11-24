@@ -21,11 +21,9 @@ class TestCircuitAtlas(unittest.TestCase):
             "style.css",
             "model.js",
             "diagram.js",
-            "sheet.js",
+            "render-engine.js",
             "architecture.js",
             "app.js",
-            "program.js",
-            "program-ui.js",
         ]
         for fname in required:
             path = os.path.join(CIRCUITS_DIR, fname)
@@ -39,8 +37,8 @@ class TestCircuitAtlas(unittest.TestCase):
         self.assertIn('id="map"', content)
         self.assertIn('id="world"', content)
         self.assertIn('id="workbench"', content)
-        self.assertIn('id="inspectorBody"', content)
         self.assertIn('diagram.js', content)
+        self.assertLess(content.index('render-engine.js'), content.index('architecture.js'))
 
     def test_all_circuit_modules_render_via_node(self):
         node_bin = lint_schematics.find_node()
@@ -89,6 +87,7 @@ class TestCircuitAtlas(unittest.TestCase):
         global.document = { getElementById: () => ({ setAttribute: () => {}, textContent: '' }) };
         require('./circuits-side/model.js');
         require('./circuits-side/diagram.js');
+        require('./circuits-side/render-engine.js');
         require('./circuits-side/architecture.js');
         const svg = global.board.render(1, 'alu', 0);
         if (!svg || svg.length < 1000) {
@@ -250,20 +249,50 @@ class TestSchematicLinter(unittest.TestCase):
     # 4. Macro Architecture Pin Bridge Alignment Tests
     # ------------------------------------------------------------------------
     def test_macro_pin_bridge_alignment(self):
-        """Verify architecture.js pinMap coordinates stay within unit boundaries."""
-        arch_path = os.path.join(REPO_DIR, "circuits-side", "architecture.js")
-        with open(arch_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        """Board wires terminate on the rendered named ports after layout."""
+        script = """
+        global.window = global;
+        require('./circuits-side/model.js');
+        require('./circuits-side/diagram.js');
+        require('./circuits-side/render-engine.js');
+        require('./circuits-side/architecture.js');
+        console.log(JSON.stringify({nodes: board.N, ...board.layout()}));
+        """
+        proc = subprocess.run(
+            [lint_schematics.find_node(), "-e", script], cwd=REPO_DIR,
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        layout = json.loads(proc.stdout)
+        self.assertEqual(len(layout["connections"]), 53)
+        for connection in layout["connections"]:
+            net, points = connection["net"], connection["points"]
+            for endpoint, name, owner in (
+                (points[0], net[4], net[1]), (points[-1], net[5], net[2]),
+            ):
+                pin = layout["pins"][name]
+                self.assertEqual(pin["owner"], owner)
+                self.assertEqual(endpoint, {"x": pin["x"], "y": pin["y"]})
+                x, y, width, height = layout["nodes"][owner][:4]
+                self.assertIn(pin["x"], (x, x + width))
+                self.assertGreater(pin["y"], y + 20, "Ports must clear the title")
+                self.assertLess(pin["y"], y + height)
+            for start, end in zip(points, points[1:]):
+                self.assertTrue(start["x"] == end["x"] or start["y"] == end["y"])
+                for owner, box in layout["nodes"].items():
+                    x, y, width, height = box[:4]
+                    if start["y"] == end["y"]:
+                        crosses = y < start["y"] < y + height and (
+                            max(start["x"], end["x"]) > x
+                            and min(start["x"], end["x"]) < x + width
+                        )
+                    else:
+                        crosses = x < start["x"] < x + width and (
+                            max(start["y"], end["y"]) > y
+                            and min(start["y"], end["y"]) < y + height
+                        )
+                    self.assertFalse(crosses, f"{net[0]} crosses {owner}")
 
-        circuits = lint_schematics.extract_circuits()
-        for unit in ["regs", "alu"]:
-            if unit in circuits:
-                matches = re.findall(rf"lx:\s*(\d+(?:\.\d+)?),\s*ly:\s*(\d+(?:\.\d+)?)", content)
-                self.assertGreater(len(matches), 0, f"Could not find pin coordinates for {unit}")
-                for lx_s, ly_s in matches[:5]:
-                    lx, ly = float(lx_s), float(ly_s)
-                    self.assertGreaterEqual(lx, 0, f"Pin lx {lx} < 0 in {unit}")
-                    self.assertGreaterEqual(ly, 0, f"Pin ly {ly} < 0 in {unit}")
 
 
 if __name__ == "__main__":

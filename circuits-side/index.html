@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#090d16" />
-    <title>Intel 8086 Microprocessor &amp; System Board Schematic CAD</title>
+    <title>8086 Circuit Workbench</title>
+    <meta name="description" content="Explore the Intel 8086 processor and system board, from architecture to individual logic gates." />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -21,7 +22,7 @@
         </svg>
         <div class="brand-text">
           <span class="chip-title">INTEL 8086</span>
-          <span class="chip-sub">Pure Digital Logic &amp; System Board CAD</span>
+          <span class="chip-sub">Circuit Workbench</span>
         </div>
       </div>
 
@@ -29,48 +30,6 @@
         <label for="find" class="jump-label">Component:</label>
         <select id="find" aria-label="Select and jump to component">
           <option value="" disabled selected>Jump to Circuit Block...</option>
-          <optgroup label="Execution Unit (EU)">
-            <option value="regs">01. 16-Bit Dual-Port Register File (AX, BX, CX, DX, SP, BP, SI, DI)</option>
-            <option value="internal">02. 16-Bit Internal Data Bus &amp; Crossbar Taps</option>
-            <option value="temps">03. Operand Temporary Latches (tmpA, tmpB, tmpC)</option>
-            <option value="aluctl">04. ALU Control Decoder &amp; Operation Selector</option>
-            <option value="mux">05. ALU Input Multiplexer (3:1)</option>
-            <option value="alu">06. 16-Bit Full Adder / ALU Logic Slice</option>
-            <option value="flags">07. Status &amp; Control Flags Register (CF, ZF, SF, OF, PF, AF)</option>
-          </optgroup>
-          <optgroup label="Bus Interface Unit (BIU)">
-            <option value="seg">08. 16-Bit Segment Base Registers (CS, DS, SS, ES)</option>
-            <option value="ip">09. Instruction Pointer (IP) &amp; Fast +1/+2 Incrementer</option>
-            <option value="segmux">10. Segment Multiplexer (4:1) &amp; Base Shifter (&lt;&lt; 4)</option>
-            <option value="ind">11. Indirect Offset Register (IND / Effective Address Latch)</option>
-            <option value="adder">12. BIU Dedicated 20-Bit Physical Address Adder</option>
-            <option value="offmux">13. Offset Selector Multiplexer (2:1)</option>
-            <option value="opr">14. Operand Bus Data Latch &amp; Transceiver (OPR)</option>
-            <option value="queue">15. 6-Byte Instruction Prefetch Queue (FIFO)</option>
-            <option value="memory">16. Bus Controller &amp; T-State Engine (T1..T4, ALE, RD#, WR#)</option>
-            <option value="ext">17. 40-Pin Ceramic DIP Package &amp; ESD Protection Cell</option>
-          </optgroup>
-          <optgroup label="Control Unit (CU)">
-            <option value="loader">18. Instruction Loader &amp; ModR/M Field Splitter</option>
-            <option value="ir">19. Instruction Register (8-Bit IR Opcode Latch)</option>
-            <option value="prefix">20. Prefix Recognition &amp; Segment Override Latch</option>
-            <option value="pla">21. Group Decode ROM / Classification PLA</option>
-            <option value="trom">22. Translation ROM (TROM Dispatch Matrix)</option>
-            <option value="engine">23. Microcode Sequencing Engine &amp; Jump Multiplexer</option>
-            <option value="mar">24. Microcode Address Register (13-Bit MAR)</option>
-            <option value="rom">25. Microcode Control Store (512 Words x 21 Bits ROM)</option>
-            <option value="ctl">26. Control Signal Latches &amp; Field Decoders</option>
-            <option value="clk">27. 8284A Clock Generator &amp; Crystal Divider</option>
-            <option value="seq">28. Phase Sequencer (3-Stage JK Flip-Flops)</option>
-            <option value="dec">29. Control Enable Matrix (4:16 Line Decoder)</option>
-          </optgroup>
-          <optgroup label="System Board (Off-Chip)">
-            <option value="latches">30. 8282 / 74LS373 Address Demux Latches (A19..A0)</option>
-            <option value="transceivers">31. 8286 / 74LS245 System Data Bus Transceivers</option>
-            <option value="decoder">32. 74LS138 System Address Decoder (Chip Selects)</option>
-            <option value="bootrom">33. 2764 Boot EPROM (Reset Vector at 0xFFFF0)</option>
-            <option value="ram">34. 16-Bit System Static RAM (Even &amp; Odd Banks)</option>
-          </optgroup>
         </select>
       </div>
 
@@ -100,14 +59,6 @@
         </svg>
       </div>
 
-      <!-- Hidden elements for backward test compatibility -->
-      <div id="inspectorBody" hidden></div>
-      <div id="status" hidden>Ready</div>
-      <button id="run" hidden></button>
-      <button id="step" hidden></button>
-      <button id="explore" hidden></button>
-      <button id="revise" hidden></button>
-      <div id="signalHud" hidden></div>
     </main>
 
     <footer class="boardlegend">
@@ -124,8 +75,11 @@
       </div>
     </footer>
 
+    <noscript>Enable JavaScript to explore the 8086 circuit workbench.</noscript>
+
     <script src="model.js"></script>
     <script src="diagram.js"></script>
+    <script src="render-engine.js"></script>
     <script src="architecture.js"></script>
     <script src="app.js"></script>
   </body>

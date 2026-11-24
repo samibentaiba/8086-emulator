@@ -3,7 +3,7 @@
 /// <reference path="../engine.ts" />
 
 /**
- * Intel 8086 Circuit Atlas - Control Unit (CU) Modular Engine
+ * Intel 8086 Circuit Workbench - Control Unit (CU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, DffCell.
  *
  * 11 Target Units:
@@ -29,7 +29,7 @@
  *   - 100% Mathematical Outer Pin Alignment with architecture.js
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
   // =========================================================================
   // 1. INSTRUCTION BYTE LOADER & MODR/M FIELD DECODER (LOADER)
@@ -38,7 +38,7 @@ namespace LogicDraw {
   // Right Top:  lx = 380, ly = 65 (OPCODE[7:0] to loader-to-ir)
   // Right Btm:  lx = 380, ly = 140 (MODR/M to loader-to-trom)
   // =========================================================================
-  export function loaderLogic(s: any): string {
+  export function loaderLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const modVal = (s && s.mod != null) ? s.mod : 0;
@@ -154,7 +154,7 @@ namespace LogicDraw {
   // Left Port:  lx = 20, ly = 85  (OPCODE[7:0] from loader-to-ir)
   // Right Port: lx = 320, ly = 85 (IR_OP[7:0] to ir-to-pla)
   // =========================================================================
-  export function irLogic(s: any): string {
+  export function irLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const v = (s && s.ir != null) ? (s.ir & 0xff) : 0;
@@ -227,7 +227,7 @@ namespace LogicDraw {
   // Left Port:  lx = 25, ly = 85  (STREAM[7:0] from queue-to-loader)
   // Right Port: lx = 335, ly = 85 (OVERRIDE to prefix-override)
   // =========================================================================
-  export function prefixLogic(s: any): string {
+  export function prefixLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const pfx = (s && s.prefix != null) ? s.prefix : 0;
@@ -312,7 +312,7 @@ namespace LogicDraw {
   // Left Port:  lx = 30, ly = 30   (IR_OP[7:0] from ir-to-pla)
   // Right Port: lx = 390, ly = 100 (CLASS[14:0] to pla-to-engine)
   // =========================================================================
-  export function plaLogic(s: any): string {
+  export function plaLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const ir = (s && s.ir != null) ? s.ir : 0;
@@ -398,7 +398,7 @@ namespace LogicDraw {
   // Left Port:  lx = 50, ly = 25   (MODR/M from loader-to-trom)
   // Right Port: lx = 380, ly = 100 (TARGET[12:0] to trom-to-engine)
   // =========================================================================
-  export function tromLogic(s: any): string {
+  export function tromLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const modVal = (s && s.mod != null) ? s.mod : 0;
@@ -470,7 +470,7 @@ namespace LogicDraw {
   // Left Bottom: lx = 25, ly = 120  (CLASS[14:0] from pla-to-engine)
   // Bottom Lead: lx = 200, ly = 160 (NEXT_µADDR[12:0] to engine-to-mar)
   // =========================================================================
-  export function engineLogic(s: any): string {
+  export function engineLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const phase = (s && s.phase != null) ? s.phase : 1;
@@ -567,7 +567,7 @@ namespace LogicDraw {
   // Left Port:  lx = 25, ly = 85  (NEXT[12:0] from engine-to-mar)
   // Right Port: lx = 335, ly = 85 (µADDR[12:0] to mar-to-rom)
   // =========================================================================
-  export function marLogic(s: any): string {
+  export function marLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const phase = (s && s.phase != null) ? s.phase : 0;
@@ -644,7 +644,7 @@ namespace LogicDraw {
   // Left Port:  lx = 25, ly = 90  (µADDR[12:0] from mar-to-rom)
   // Right Port: lx = 395, ly = 90 (µWORD[20:0] to rom-to-ctl)
   // =========================================================================
-  export function romLogic(s: any): string {
+  export function romLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     // Top Title Banner
@@ -721,7 +721,7 @@ namespace LogicDraw {
   // Left Top:    lx = 25, ly = 20 (CTL_STROBES to ctl-to-regs)
   // Left Bottom: lx = 25, ly = 85 (µWORD[20:0] from rom-to-ctl)
   // =========================================================================
-  export function ctlLogic(s: any): string {
+  export function ctlLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const phase = (s && s.phase != null) ? s.phase : 0;
@@ -821,7 +821,7 @@ namespace LogicDraw {
   // Left Port:  lx = 25, ly = 95  (5MHz_CLK from clock-to-seq)
   // Right Port: lx = 380, ly = 95 (Q[2:0] + PAGE to seq-to-dec)
   // =========================================================================
-  export function seqLogic(s?: any): string {
+  export function seqLogic(s?: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const ph = (s && s.phase != null) ? s.phase : (typeof cpu !== "undefined" && cpu.s ? (cpu.s.phase || 0) : 0);
@@ -867,7 +867,7 @@ namespace LogicDraw {
       canvas.addDot(cx + 4, 36, "#16a34a", 1.5);
 
       // Discrete DffCell core
-      const dff = new DffCell(`seq_ff_${i}`, cx + 10, 72, 20, 22, q[i], clock);
+      const dff = new DffCell(`seq_ff_${i}`, cx + 10, 72, 20, 22, q[i], Boolean(clock));
       canvas.addComponent(dff);
 
       // Output tap to Y = 95 collector bus
@@ -897,7 +897,7 @@ namespace LogicDraw {
   // Left Port:  lx = 25, ly = 95  (Q[2:0] + PAGE from seq-to-dec)
   // Right Port: lx = 360, ly = 178 (ENABLE BUS to bus)
   // =========================================================================
-  export function decLogic(s?: any): string {
+  export function decLogic(s?: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const sel = (s && s.phase != null) ? s.phase : (typeof cpu !== "undefined" && cpu.line ? cpu.line() : 0);

@@ -3,7 +3,7 @@
 /// <reference path="../engine.ts" />
 
 /**
- * Intel 8086 Circuit Atlas - Execution Unit (EU) Modular Engine
+ * Intel 8086 Circuit Workbench - Execution Unit (EU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate, TriStateBuffer, DffCell.
  * Units:
  *   1. internalBusLogic (16-Bit Internal Data Bus & Synchronous Crossbar Taps)
@@ -20,14 +20,14 @@
  *   - 100% Mathematical Outer Pin Alignment with architecture.js
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
   // =========================================================================
   // 1. 16-BIT INTERNAL DATA BUS & SYNCHRONOUS CROSSBAR TAPS
   // Multi-Drop Parallel Bus Highway with 6 Unit Transceiver Cells & Microcode Arbitration
   // Viewport: 460 x 160
   // =========================================================================
-  export function internalBusLogic(s: any): string {
+  export function internalBusLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const busVal = (s.lastWord !== undefined && s.lastWord !== null) ? s.lastWord : ((s.ax ?? 0) & 0xffff);
@@ -157,130 +157,72 @@ namespace LogicDraw {
   // 3x 16-Bit Transparent D-Latches with Discrete Steering and Storage NANDs
   // Viewport: 468 x 216
   // =========================================================================
-  export function tempsLogic(s: any): string {
-    const canvas = new SchematicCanvas();
-
+  export function tempsLogic(s: SchematicState): string {
+    const canvas = new SchematicCanvas({ bounds: { x: 6, y: 6, w: 456, h: 210 } });
     const phase = (s.phase || 0) % 8;
-    const aVal = s.a ?? s.ax ?? 0;
-    const bVal = s.b ?? s.bx ?? 0;
-    const cVal = s.c ?? 0;
-
     const latches = [
-      { id: "tmpa", name: "tmpA", val: aVal, cx: 75,  en: phase === 3, col: "#0284c7" },
-      { id: "tmpb", name: "tmpB", val: bVal, cx: 205, en: phase === 4, col: "#059669" },
-      { id: "tmpc", name: "tmpC", val: cVal, cx: 335, en: phase === 6, col: "#d97706" }
+      { id: "tmpa", name: "tmpA", val: s.a ?? s.ax ?? 0, cx: 75, en: phase === 3, col: "#0284c7" },
+      { id: "tmpb", name: "tmpB", val: s.b ?? s.bx ?? 0, cx: 205, en: phase === 4, col: "#059669" },
+      { id: "tmpc", name: "tmpC", val: s.c ?? 0, cx: 335, en: phase === 6, col: "#d97706" },
     ];
-
-    // 0. Top System Title Banner
     canvas.addBackground(R(10, 6, 448, 14, "#f8fafc", "#cbd5e1", 2, 0.8));
-    canvas.addLabel(18, 16, "INTEL 8086 OPERAND TEMPORARY LATCHES · tmpA, tmpB, tmpC", 6.8, 'font-weight="bold" fill="#0f172a"');
-    canvas.addLabel(450, 16, "16-BIT TRANSPARENT D-LATCH ARRAYS", 5.6, 'text-anchor="end" font-weight="bold" fill="#0d9488"');
+    canvas.addLabel(18, 16, "OPERAND TEMPORARY LATCHES · THREE 16-BIT TRANSPARENT D-LATCH BANKS", 6.3, 'font-weight="bold"');
+    canvas.addBus(P("M12 22H455", paths.data, 2.0));
+    canvas.addBackground(R(451, 18, 8, 8, "#fed7aa", "#c2410c", 1, 1));
+    canvas.addDot(455, 22, paths.data, 1.8);
+    canvas.addBus(P("M20 180H400", paths.control, 1.2));
+    canvas.addLabel(398, 176, "LE[2:0]", 5, 'text-anchor="end"');
 
-    // 1. Data In Highway (Y = 22, X = 20 to 455)
-    // Matches architecture.js pin: lx = 455, ly = 22
-    canvas.addBus(P("M20 22H455", paths.data, 2.0));
-    canvas.addWire(busSlash(435, 22, "16", paths.data));
-    canvas.addLabel(430, 16, "D_IN[15:0]", 5.2, 'text-anchor="end" font-weight="bold" fill="#0d9488"');
+    for (const bank of latches) {
+      const x = bank.cx;
+      const color = bank.en ? bank.col : "#94a3b8";
+      canvas.addBackground(R(x - 59, 28, 118, 142, "#ffffff", "#cbd5e1", 3, 0.8));
+      canvas.addBackground(R(x - 59, 28, 118, 12, "#f1f5f9", "#cbd5e1", 2, 0.8));
+      canvas.addLabel(x - 53, 37, `${bank.name} [15:0]`, 5.6, 'font-weight="bold"');
+      canvas.addLabel(x + 53, 37, hex(bank.val) + "h", 5.6, 'text-anchor="end" font-weight="bold"');
+      canvas.reserve({ x: x - 59, y: 28, w: 118, h: 12 });
 
-    // Right Port Box container (x = 395, w = 60 -> contact pad at 455, 22)
-    const portIn = new PortBox("port_temps_in", 395, 12, 60, 22, "D_IN", "right", "input", "#f0fdf4", "#15803d");
-    portIn.addPortPin("din", 10, "D_IN[15:0]", true, paths.data, 16);
-    canvas.addComponent(portIn);
+      // Each bank uses the same connected NAND latch, translated in X. Pins,
+      // gates and all feedback routes move together; no duplicated wire pixels.
+      const inverter = new LogicGate(`${bank.id}_inv`, x - 46, 100, "inv", 10, 10, bank.en);
+      const steerSet = new LogicGate(`${bank.id}_set`, x - 18, 52, "nand", 12, 16, bank.en);
+      const steerReset = new LogicGate(`${bank.id}_reset`, x - 18, 100, "nand", 12, 16, bank.en);
+      const storeQ = new LogicGate(`${bank.id}_q`, x + 22, 52, "nand", 12, 16, Boolean(bank.val & 1));
+      const storeNotQ = new LogicGate(`${bank.id}_notq`, x + 22, 100, "nand", 12, 16, !(bank.val & 1));
+      [inverter, steerSet, steerReset, storeQ, storeNotQ].forEach(gate => canvas.addComponent(gate));
+      const data = { x: x - 63, y: 22 };
+      const enable = { x: x - 55, y: 180 };
+      const net = (name: string, netColor = color): RouteOptions => ({ net: `${bank.id}.${name}`, color: netColor, width: 1 });
+      canvas.connect(data, steerSet.pin("in0"), net("d", paths.data));
+      canvas.connect(data, inverter.pin("in0"), net("d", paths.data));
+      canvas.connect(enable, steerSet.pin("in1"), net("le", paths.control));
+      canvas.connect(enable, steerReset.pin("in1"), net("le", paths.control));
+      canvas.connect(inverter.pin("out"), steerReset.pin("in0"), net("notd"));
+      canvas.connect(steerSet.pin("out"), storeQ.pin("in0"), net("set"));
+      canvas.connect(steerReset.pin("out"), storeNotQ.pin("in1"), net("reset"));
+      canvas.connect(storeQ.pin("out"), storeNotQ.pin("in0"), net("q"));
+      canvas.connect(storeNotQ.pin("out"), storeQ.pin("in1"), net("notq"));
+      canvas.connect(storeQ.pin("out"), { x, y: 188 }, net("q", bank.col));
+      canvas.addDot(data.x, data.y, paths.data, 1.5);
+      canvas.addDot(enable.x, enable.y, paths.control, 1.5);
 
-    // 2. Control Enable Strobe Rail (Y = 175, X = 20 to 400)
-    canvas.addBus(P("M20 175H400", paths.control, 1.2));
-    canvas.addLabel(22, 171, "LE[2:0] STROBES", 4.8, 'font-weight="bold" fill="#7c3aed"');
-
-    // 3. Three Latch Banks
-    latches.forEach((l) => {
-      const cx = l.cx;
-      const bx = cx - 59;
-      const by = 28;
-      const bw = 118;
-      const bh = 142;
-      const isEn = l.en;
-      const bdrCol = isEn ? l.col : "#cbd5e1";
-      const bgCol = isEn ? "#f0fdf4" : "#ffffff";
-
-      // Card Background (height 12 avoids header occlusion rule [13, 14, 18])
-      canvas.addBackground(R(bx, by, bw, bh, bgCol, bdrCol, 3, isEn ? 1.4 : 0.8));
-      canvas.addBackground(R(bx, by, bw, 12, isEn ? "#dcfce7" : "#f8fafc", bdrCol, 2, 0.8));
-      canvas.addLabel(bx + 6, by + 9.5, l.name + " [15:0]", 5.6, `font-weight="bold" fill="${isEn ? l.col : '#0f172a'}"`);
-      canvas.addLabel(bx + bw - 6, by + 9.5, hex(l.val, 4) + "h", 5.6, `text-anchor="end" font-weight="bold" fill="${l.col}"`);
-
-      // Zone 1 (Input & LE Drops):
-      // Data in drop: at cx - 40, Y = 22 down to Y = 62
-      canvas.addWire(P(`M${cx - 40} 22V62`, paths.data, 1.2));
-      canvas.addDot(cx - 40, 22, paths.data, 1.8);
-      // Turn right to Steering NAND 1
-      canvas.addWire(P(`M${cx - 40} 62H${cx - 24}`, paths.data, 1.0));
-      // Branch down to Inverter for Steering NAND 2
-      canvas.addWire(P(`M${cx - 40} 62V78H${cx - 30}`, paths.data, 1.0));
-      canvas.addDot(cx - 40, 62, paths.data, 1.4);
-
-      // Inverter for lower data bit
-      const invD = new LogicGate(`inv_${l.id}`, cx - 30, 74, "inv", 8, 8, isEn);
-      canvas.addComponent(invD);
-      canvas.addWire(P(`M${cx - 22} 78H${cx - 24}`, paths.data, 1.0));
-
-      // LE Strobe drop: at cx - 48, rising from Y = 175 to Y = 66
-      canvas.addWire(P(`M${cx - 48} 175V66`, paths.control, 1.0));
-      canvas.addDot(cx - 48, 175, paths.control, 1.6);
-      canvas.addWire(P(`M${cx - 48} 66H${cx - 24}`, paths.control, 1.0));
-      canvas.addWire(P(`M${cx - 48} 66V82H${cx - 24}`, paths.control, 1.0));
-      canvas.addDot(cx - 48, 66, paths.control, 1.4);
-
-      // Zone 2 (Discrete Gate Bodies):
-      // Steering NANDs (Column 1):
-      const nand1 = new LogicGate(`nand1_${l.id}`, cx - 24, 59, "nand", 14, 10, isEn);
-      const nand2 = new LogicGate(`nand2_${l.id}`, cx - 24, 75, "nand", 14, 10, isEn);
-      canvas.addComponent(nand1);
-      canvas.addComponent(nand2);
-
-      // Storage NANDs (Column 2):
-      const nand3 = new LogicGate(`nand3_${l.id}`, cx + 8, 59, "nand", 14, 10, true);
-      const nand4 = new LogicGate(`nand4_${l.id}`, cx + 8, 75, "nand", 14, 10, false);
-      canvas.addComponent(nand3);
-      canvas.addComponent(nand4);
-
-      // Zone 3: Interconnects & Cross-Coupling Feedback
-      // Steering 1 output (cx - 10, 64) -> NAND 3 in0 (cx + 8, 62)
-      canvas.addWire(P(`M${cx - 10} 64H${cx - 2}V62H${cx + 8}`, paths.data, 1.0));
-      // Steering 2 output (cx - 10, 80) -> NAND 4 in1 (cx + 8, 82)
-      canvas.addWire(P(`M${cx - 10} 80H${cx - 2}V82H${cx + 8}`, paths.data, 1.0));
-
-      // Cross coupling feedback:
-      // NAND 3 output (cx + 22, 64) drops at cx + 26 down to Y = 70 then into NAND 4 in0 (cx + 8, 77)
-      canvas.addWire(P(`M${cx + 22} 64H${cx + 26}V70H${cx + 2}V77H${cx + 8}`, paths.data, 1.0));
-      canvas.addDot(cx + 26, 64, paths.data, 1.4);
-      // NAND 4 output (cx + 22, 80) rises at cx + 30 up to Y = 74 then into NAND 3 in1 (cx + 8, 67)
-      canvas.addWire(P(`M${cx + 22} 80H${cx + 30}V74H${cx + 2}V67H${cx + 8}`, paths.data, 1.0));
-      canvas.addDot(cx + 30, 80, paths.data, 1.4);
-
-      // 16-Bit Discrete Bitcell Storage Display
-      // Two rows of 8 cells: Row 0 at Y = 98, Row 1 at Y = 112
+      // Register-value readout is a reserved region, not an obstacle discovered
+      // by inspecting SVG after drawing.
+      canvas.reserve({ x: x - 47, y: 138, w: 95, h: 26 });
       for (let bit = 15; bit >= 0; bit--) {
         const row = bit >= 8 ? 0 : 1;
-        const col = bit >= 8 ? (15 - bit) : (7 - bit);
-        const cellX = (cx - 47) + col * 12;
-        const cellY = 98 + row * 14;
-        const b = (l.val >>> bit) & 1;
-        const bCol = b ? "#16a34a" : "#64748b";
-        const bFill = b ? "#dcfce7" : "#ffffff";
-        canvas.addBackground(R(cellX, cellY, 11, 11, bFill, b ? "#16a34a" : "#cbd5e1", 2, 0.8));
-        canvas.addLabel(cellX + 5.5, cellY + 8, String(b), 4.8, `text-anchor="middle" font-weight="bold" fill="${bCol}"`);
+        const column = bit >= 8 ? 15 - bit : 7 - bit;
+        const bx = x - 47 + column * 12, by = 138 + row * 14;
+        const value = (bank.val >>> bit) & 1;
+        canvas.addBackground(R(bx, by, 11, 11, value ? "#dcfce7" : "#ffffff", "#cbd5e1", 1, 0.6));
+        canvas.addLabel(bx + 5.5, by + 8, value, 4.8, 'text-anchor="middle"');
       }
-      canvas.addLabel(bx + 8, 134, "BIT STORAGE [15:0]", 4.0, 'font-weight="bold" fill="#64748b"');
-
-      // Output Bus: drops from cx at Y = 140 straight down to bottom terminal pad (cx, 216)
-      // Matches architecture.js pin: tmpA -> (75, 216), tmpB -> (205, 216), tmpC -> (335, 216)
-      canvas.addBus(P(`M${cx} 140V216`, l.col, 2.0));
-      canvas.addBackground(R(cx - 5, 212, 10, 8, "#fed7aa", "#c2410c", 2, 1.0));
-      canvas.addDot(cx, 216, l.col, 2.2);
-      canvas.addWire(busSlash(cx, 195, "16", l.col));
-      canvas.addLabel(cx + 4, 205, l.name + "[15:0]", 5.2, `font-weight="bold" fill="${l.col}"`);
-    });
-
+      canvas.addBus(P(`M${x} 188V210`, bank.col, 2));
+      canvas.addBackground(R(x - 5, 206, 10, 8, "#fed7aa", "#c2410c", 2, 1));
+      canvas.addDot(x, 210, bank.col, 2);
+      canvas.addWire(busSlash(x, 195, "16", bank.col));
+      canvas.addLabel(x + 4, 205, `${bank.name}[15:0]`, 5.2, `fill="${bank.col}"`);
+    }
     return canvas.render();
   }
 
@@ -289,7 +231,7 @@ namespace LogicDraw {
   // Decodes 5-bit Micro-Op into ALU_OP[4:0] Function Bus & SEL[1:0] Mux Select Bus
   // Viewport: 360 x 200
   // =========================================================================
-  export function aluctlLogic(s: any): string {
+  export function aluctlLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const op = s.op || "ADD";
@@ -422,7 +364,7 @@ namespace LogicDraw {
   // 16-Bit 3-to-1 Multiplexer Feeding ALU Operand Input A with Discrete AND-OR Slices
   // Viewport: 400 x 220
   // =========================================================================
-  export function muxLogic(s: any): string {
+  export function muxLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const aVal = s.a ?? s.ax ?? 0;

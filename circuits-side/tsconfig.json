@@ -4,10 +4,11 @@
     "module": "None",
     "outFile": "./diagram.js",
     "rootDir": "./src",
-    "strict": false,
-    "noImplicitAny": false,
+    "strict": true,
+    "noEmitOnError": true,
+    "types": [],
     "removeComments": false,
     "lib": ["DOM", "ES2020"]
   },
-  "include": ["src/**/*"]
+  "files": ["src/index.ts"]
 }

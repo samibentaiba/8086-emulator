@@ -9,20 +9,20 @@ An advanced Intel 8086 microprocessor emulator, assembler, and virtual hardware 
 
 ---
 
-## What's New in v5.2 (LazyVim Modal Editor, Time-Travel Debugging, Circuit Atlas & Zero-Glitch Overhaul)
-- **100% Interactive 8086 Circuit Atlas (`emu8086-circuit` / `python main.py -c`)**:
-  - Full gate-level and architectural schematic visualization of all 29 Intel 8086 functional units across the Execution Unit (EU), Bus Interface Unit (BIU), and Control Unit (CU).
-  - Deep semantic zoom: architecture level $\rightarrow$ block level $\rightarrow$ transistor/gate-level schematic detail with "Inspect gates" for every component.
-  - Interactive Intel 8086 40-Pin DIP Package Visualizer with live pin LEDs (1/0) and address/data multiplexing telemetry (T1 Address vs T2-T4 Data on AD0-AD15).
+## What's New in v5.2 (LazyVim Modal Editor, Time-Travel Debugging & Circuit Workbench)
+- **8086 Circuit Workbench (`emu8086-circuit` / `python main.py -c`)**:
+  - Architectural and gate-level visualization of 34 CPU and system-board units, covering the Execution Unit (EU), Bus Interface Unit (BIU), Control Unit (CU), and supporting chips.
+  - Zoom from the board overview into gate detail, select a component, and pan across the schematic with mouse, touch, or keyboard controls.
+  - Intel 8086 40-pin DIP package view with address/data multiplexing and control signals.
   - Authentic Boolean logic circuits: 16-input NOR zero-detector (ZF), sign tap (SF), 8-input parity tree (PF), signed overflow XOR (OF), carry/borrow logic (CF, AF).
   - Dual-port 16-bit register file (AX, BX, CX, DX, SP, BP, SI, DI) with live read/write buses and high/low byte multiplexers.
   - Dedicated 20-bit BIU physical address adder ($(\text{Segment} \ll 4) + \text{Offset}$), 6-byte prefetch FIFO queue, T-state bus controller, and 8284A clock generator.
-  - Code-to-Circuit execution bridge: assemble and step through your assembly programs with live signal path illumination.
+  - The browser view is a circuit explorer backed by a small demonstration model. Assemble and execute arbitrary programs in the Python CLI, TUI, or desktop GUI.
 - **Dual Applications: Standalone TUI & PyQt5 GUI**:
   - **`emu8086-tui`**: Terminal User Interface application. Pure Python standard library + curses (zero external dependencies). Runs in any Linux/NixOS terminal, tmux, or SSH session.
-  - **`emu8086-gui`**: Desktop graphical workbench with memory inspection tables, visual code editor, dedicated peripheral simulator windows, and one-click Circuit Atlas launcher. Transparent NixOS integration via `shell.nix`.
-  - **`emu8086-circuit`**: Direct browser launcher for the 8086 Circuit Atlas schematic workbench.
-  - **`emu8086`**: Unified CLI supporting headless execution (`-n`), interrupt traces (`-i`), Circuit Atlas (`-c`), and batch testing.
+  - **`emu8086-gui`**: Desktop graphical workbench with memory inspection tables, visual code editor, dedicated peripheral simulator windows, and one-click Circuit Workbench launcher. Transparent NixOS integration via `shell.nix`.
+  - **`emu8086-circuit`**: Direct browser launcher for the 8086 Circuit Workbench.
+  - **`emu8086`**: Unified CLI supporting headless execution (`-n`), interrupt traces (`-i`), Circuit Workbench (`-c`), and batch testing.
 - **Neovim-Style Terminal Workflow (`emu8086-tui [file.asm]`)**:
   - Execute `emu8086-tui` directly from ANY directory in your terminal.
   - Open existing `.asm` files or specify a new file name: non-existent files automatically open with a starter MASM template (`[New File]`), exactly like `nvim`.
@@ -248,6 +248,32 @@ python3 mainUI.py [optional_file.asm]
 - **Live Memory Tables**: Dedicated views for Stack (`SS:SP`), Code (`CS:IP`), and Data (`DS`) segments.
 
 ---
+
+### 4. Circuit Workbench development
+
+The active browser application lives in `circuits-side/`. Its model, board renderer,
+interaction controls, gate components, and routing engine are authored in TypeScript
+under `circuits-side/src/`. JavaScript files served by `index.html` are build outputs.
+
+```bash
+cd circuits-side
+npm ci
+npm run dev
+```
+
+See [`circuits-side/README.md`](circuits-side/README.md) for the source map, shared
+engine API, and validation commands. The existing Python launcher only serves
+built static assets and opens the browser. The obsolete
+`circuit-study` Logic Atlas site and the unused browser assembly editor, Python worker,
+and Pyodide runtime have been removed. The Python emulator and its CLI, TUI, and GUI
+remain the assembly execution tools.
+
+Validate schematic geometry after changing circuit components or connections:
+
+```bash
+python build_circuits.py
+python tools/lint_schematics.py --all --strict
+```
 
 ## Virtual Hardware Peripherals (EMU8086 Specification)
 

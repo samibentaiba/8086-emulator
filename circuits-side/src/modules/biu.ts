@@ -3,7 +3,7 @@
 /// <reference path="../engine.ts" />
 
 /**
- * Intel 8086 Circuit Atlas - Bus Interface Unit (BIU) Modular Engine
+ * Intel 8086 Circuit Workbench - Bus Interface Unit (BIU) Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, SubcircuitCard, LogicGate.
  * Units:
  *   1. segLogic (16-bit Segment Registers CS, DS, SS, ES)
@@ -24,14 +24,14 @@
  *   - 100% Mathematical Outer Pin Alignment with architecture.js
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
   // =========================================================================
   // 1. 16-BIT SEGMENT REGISTERS (CS, DS, SS, ES)
   // 4x 16-Bit Discrete Register Arrays, 2:4 Address Decoder, Tri-State Drivers
   // Viewport: 400 x 200
   // =========================================================================
-  export function segLogic(s: any): string {
+  export function segLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const csVal = s.cs ?? 0x1200;
@@ -167,7 +167,7 @@ namespace LogicDraw {
   // Dedicated Half-Adder Incrementer Pipeline, 16 D-FF Array
   // Viewport: 380 x 200
   // =========================================================================
-  export function ipLogic(s: any): string {
+  export function ipLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const ipVal = s.ip ?? 0x0100;
@@ -259,7 +259,7 @@ namespace LogicDraw {
   // 100% Planar 3-Zone Full Adder Nibble Matrix · Zero Gate Body Penetrations
   // Viewport: 408 x 186
   // =========================================================================
-  export function addressAdderLogic(s: any): string {
+  export function addressAdderLogic(s: SchematicState): string {
     const prefix = s.prefix;
     const isEs = prefix === 0x26;
     const isSs = prefix === 0x36 || (prefix == null && Boolean(s.isStack || s.bpUsed));
@@ -416,7 +416,7 @@ namespace LogicDraw {
   // Pure Gate-Level 4:1 Multiplexer + Direct Copper Grounded Shifter
   // Viewport: 410 x 180
   // =========================================================================
-  export function segmuxLogic(s: any): string {
+  export function segmuxLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const csVal = s.cs ?? 0x1200;
@@ -533,7 +533,7 @@ namespace LogicDraw {
   // Selects between IP [15:0] (Fetch) and IND [15:0] (Effective Address)
   // Viewport: 340 x 170
   // =========================================================================
-  export function offmuxLogic(s: any): string {
+  export function offmuxLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const isInd = s.ind != null;
@@ -609,7 +609,7 @@ namespace LogicDraw {
   // Transparent D-Latch Array capturing Displacement / Base+Index Offsets
   // Viewport: 340 x 170
   // =========================================================================
-  export function indLogic(s: any): string {
+  export function indLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const indVal = s.ind ?? 0x0000;
@@ -688,7 +688,7 @@ namespace LogicDraw {
   // Bidirectional Tri-State Bus Drivers + 16-Bit Intermediate Latch Core
   // Viewport: 380 x 190
   // =========================================================================
-  export function oprLogic(s: any): string {
+  export function oprLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const oprVal = s.opr ?? 0x0000;
@@ -775,7 +775,7 @@ namespace LogicDraw {
   // Shift Register Matrix, 3-bit WP/RP Counters, Status Detector Logic
   // Viewport: 440 x 190
   // =========================================================================
-  export function queueLogic(s: any): string {
+  export function queueLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     const q = s.queue || [];
@@ -863,7 +863,7 @@ namespace LogicDraw {
   // Discrete 5-Stage Ring Counter (T1..T4 + Tw), Strobe Synthesis Logic
   // Viewport: 408 x 216
   // =========================================================================
-  export function busControllerLogic(s: any): string {
+  export function busControllerLogic(s: SchematicState): string {
     const vw = 408;
     const canvas = new SchematicCanvas();
 
@@ -1042,7 +1042,7 @@ namespace LogicDraw {
   // Dual-Rail Clamps, 2kV GGNMOS Snapback, 300Ω Ballast, Schmitt Trigger In/Out
   // Viewport: 418 x 246
   // =========================================================================
-  export function pinsLogic(s: any): string {
+  export function pinsLogic(s: SchematicState): string {
     const vw = 418;
     const canvas = new SchematicCanvas();
 

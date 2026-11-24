@@ -3,7 +3,7 @@
 /// <reference path="../engine.ts" />
 
 /**
- * Intel 8086 Circuit Atlas - System Hardware Board (SYS) Subsystem Modular Engine
+ * Intel 8086 Circuit Workbench - System Hardware Board (SYS) Subsystem Modular Engine
  * 100% Modular OOP CAD Architecture: SchematicCanvas, PortBox, LogicGate, DffCell, TriStateBuffer.
  *
  * 6 Target Units:
@@ -24,7 +24,7 @@
  *   - 100% Mathematical Outer Pin Alignment with architecture.js
  */
 namespace LogicDraw {
-  declare const cpu: any;
+  declare const cpu: Workbench.CpuModel;
 
   // =========================================================================
   // 1. 8284A CLOCK GENERATOR (clkLogic / clockGenLogic)
@@ -34,7 +34,7 @@ namespace LogicDraw {
   // Left Inputs:  lx = 15, ly = 65 (XTAL), ly = 100 (RES#), ly = 130 (RDY1)
   // Right Output: lx = 420, ly = 105 (CLK Pin 19 to 8086 & Phase Sequencer)
   // =========================================================================
-  export function clkLogic(s: any): string {
+  export function clkLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
     const clock = (s && s.clock != null) ? s.clock : (typeof cpu !== "undefined" && cpu.s ? (cpu.s.clock || 1) : 1);
     const phase = (s && s.phase != null) ? s.phase : (typeof cpu !== "undefined" && cpu.s ? (cpu.s.phase || 0) : 0);
@@ -186,7 +186,7 @@ namespace LogicDraw {
   //               lx = 25, ly = 115 (ALE_STB from ale-to-latches)
   // Bottom Exit:  lx = 235, ly = 165 (A[19:0] Demultiplexed System Address Bus)
   // =========================================================================
-  export function latchesLogic(s: any): string {
+  export function latchesLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
     const phase = (s && s.phase != null) ? s.phase : (typeof cpu !== "undefined" && cpu.s ? (cpu.s.phase || 0) : 0);
     const ale = (phase % 4) === 0; // Transparent at T1, latched T2..T4
@@ -327,7 +327,7 @@ namespace LogicDraw {
   // Bottom Exit:  lx = 235, ly = 160 (D[15:0] System Data Bus to transceivers-to-ram)
   // Invariant Guarantee: Zero Gate Penetration (Strobes in Zone 1 / Zone 3 outside buffers).
   // =========================================================================
-  export function transceiversLogic(s: any): string {
+  export function transceiversLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
     const phase = (s && s.phase != null) ? s.phase : (typeof cpu !== "undefined" && cpu.s ? (cpu.s.phase || 0) : 0);
     const isRead = (phase % 4) >= 2;
@@ -481,7 +481,7 @@ namespace LogicDraw {
   // Right Pin2: lx = 380, ly = 155 (CS_ROM# to decoder-to-bootrom)
   // Invariant Guarantee: Minimum 3.5px clearance between all parallel horizontal wires.
   // =========================================================================
-  export function decoderChipLogic(s: any): string {
+  export function decoderChipLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
     const phys = (s && s.phys != null) ? s.phys : 0x00000;
     const a16 = (phys >> 16) & 1;
@@ -619,7 +619,7 @@ namespace LogicDraw {
   // Diode-Transistor ROM Array programmed with Reset Vector: JMP FAR 1200:0100h
   // Invariant Guarantee: ZERO FLOATING SOLDER DOTS. All dots at genuine intersections.
   // =========================================================================
-  export function bootromLogic(s: any): string {
+  export function bootromLogic(s: SchematicState): string {
     const canvas = new SchematicCanvas();
 
     // 0. Top Title Banner
@@ -742,7 +742,7 @@ namespace LogicDraw {
   // Even Bank (D[7:0], A0=0) + Odd Bank (D[15:8], BHE#=0) + 6T CMOS Cell
   // Invariant Guarantee: 100% 3-Zone Planar Routing, Zero Gate Penetrations, Zero Floating Dots.
   // =========================================================================
-  export function ramLogic(s: any): string {
+  export function ramLogic(s: SchematicState): string {
     const isRead = s && s.phase != null ? (s.phase % 4) >= 2 : true;
     const canvas = new SchematicCanvas();
 

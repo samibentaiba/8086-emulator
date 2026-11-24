@@ -1,7 +1,18 @@
+/// <reference path="workbench-types.d.ts" />
 /**
- * Intel 8086 Circuit Atlas - TypeScript Core Type Definitions & Interfaces
+ * Intel 8086 Circuit Workbench - TypeScript Core Type Definitions & Interfaces
  */
 namespace LogicDraw {
+  export interface SchematicState extends Workbench.CpuState {
+    tmpA?: number;
+    tmpB?: number;
+    bpUsed?: boolean;
+    isStack?: boolean;
+    isWrite?: boolean;
+    wait?: boolean;
+    seg?: number;
+    sel?: number;
+  }
   export type PinDirection = "L" | "R" | "T" | "B";
   export type GateType = "and" | "or" | "xor" | "nand" | "nor" | "not" | "inv" | "buf" | "mux";
 
